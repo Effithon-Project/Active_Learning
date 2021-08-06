@@ -6,7 +6,9 @@
     - base paper code [Github](github.com/Mephisto405/Learning-Loss-for-Active-Learning)
     - ssd code [Github](https://github.com/uvipen/SSD-pytorch)
     - issue
-        - https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+        - (08.06) kitti preprocessing
+        - (08.06) loss module을 위한 feature 뽑아내기
+        - (08.03) (maybe later) https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
         
     ![plan](./img/plan.png)
 

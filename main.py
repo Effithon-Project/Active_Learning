@@ -3,9 +3,6 @@
 Reference:
 [Yoo et al. 2019] Learning Loss for Active Learning (https://arxiv.org/abs/1905.03677)
 '''
-# ?? 
-# --
-
 import os
 import random
 import numpy as np
@@ -18,6 +15,7 @@ from torch.utils.data.sampler import SubsetRandomSampler #??
 # nn
 import torch
 import torch.nn as nn
+from torch.nn.parallel import DataParallel as DDP
 # learning
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
@@ -28,9 +26,22 @@ from torchvision.datasets import Kitti
 
 # custom utils from base code
 import models.resnet as resnet
-import models.lossnet2 as lossnet2
+import models.lossnet as lossnet
 from config import *
-from data.sampler import SubsetSequentialSampler #?? 아마도 라벨을 추가하는 과정에서 필요한 것 같음
+from data.sampler import SubsetSequentialSampler #아마도 라벨을 추가하는 과정에서 필요한 것 같음
+
+#----------from ssd ref code----------
+from torch.optim.lr_scheduler import MultiStepLR
+import shutil
+# custom
+from src.transform import SSDTransformer
+from src.model import SSD, ResNet
+from src.utils import generate_dboxes, Encoder #, coco_classes
+from src.loss import Loss
+from src.process import train, evaluate
+# from src.dataset import collate_fn # , CocoDataset
+
+
 
 # seed
 random.seed("Jungyeon")
@@ -38,26 +49,6 @@ torch.manual_seed(0)
 torch.backends.cudnn.deterministic = True # reproduction을 위한 부분
 # https://pytorch.org/docs/stable/notes/randomness.html
 
-train_transform = T.Compose([
-    T.RandomHorizontalFlip(),
-    T.RandomCrop(size=32, padding=4),
-    T.ToTensor(),
-    T.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]) 
-    # T.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)) # for CIFAR-100
-])
-
-test_transform = T.Compose([
-    T.ToTensor(),
-    T.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]) 
-    # T.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)) # for CIFAR-100
-])
-
-# data load and transform
-
-# directory you download 'D:\\'
-kitti_train = Kitti('D:\\', train=True, download=True)
-kitti_unlabeled = Kitti('D:\\', train=True, download=True)
-kitti_test  = Kitti('D:\\', train=False, download=True)
 
 #------------------------------Loss Prediction Loss------------------------------
 def LossPredLoss(input, target, margin=1.0, reduction='mean'):
@@ -86,69 +77,61 @@ def LossPredLoss(input, target, margin=1.0, reduction='mean'):
     return loss
 
 
-
 #------------------------------Training-------------------------------
 iters = 0
 
-def train_epoch(models, criterion, optimizers,
-                dataloaders, epoch, epoch_loss,
-                vis=None, plot_data=None):
+def train_epoch(models,
+                criterion,
+                optimizers,
+                dataloaders,
+                epoch,
+                epoch_loss,
+                vis=None,
+                plot_data=None):
+    """
+    이 부분이 SSD랑 통합하는데 가장 중요한 부분
+    ref 2의 train.py 많이 참고
+    """
     
     models['backbone'].train()
     models['module'].train()
     global iters
 
     for data in tqdm(dataloaders['train'], leave=False, total=len(dataloaders['train'])):
-        inputs = data[0].cuda()
-        labels = data[1].cuda()
-        iters += 1
+        
+        # ------------------------------------------------------------------------------------------>
+        progress_bar = dataloaders['train']
+        for i, (img, _, _, gloc, glabel) in enumerate(progress_bar):
 
-        optimizers['backbone'].zero_grad()
-        optimizers['module'].zero_grad()
-
-        scores, features = models['backbone'](inputs)
-        target_loss = criterion(scores, labels)
-
-        if epoch > epoch_loss:
-            # After 120 epochs, stop the gradient from the loss prediction module propagated to the target model.
-            # heuristic
-            features[0] = features[0].detach()
-            features[1] = features[1].detach()
-            features[2] = features[2].detach()
-            features[3] = features[3].detach()
+            img = img.cuda()
+            gloc = gloc.cuda() # gt localization
+            glabel = glabel.cuda() # gt label
+            iters += 1
             
-        pred_loss = models['module'](features)
-        pred_loss = pred_loss.view(pred_loss.size(0))
+            
+            # 수정 필요! features가 나오도록
+            # locs, confs // predicted localization, predicted label
+            ploc, plabel, features = models['backbone'](img)
+            ploc, plabel = ploc.float(), plabel.float()
+            gloc = gloc.transpose(1, 2).contiguous()
+            loss = criterion(ploc, plabel, gloc, glabel)
+            # scores, features = models['backbone'](inputs)
+            
+            # 수정 필요! features가 나오도록
+            scores = loss
+            target_loss = criterion(scores, labels)
+            
+            pred_loss = models['module'](features)
+            pred_loss = pred_loss.view(pred_loss.size(0))
 
-        m_backbone_loss = torch.sum(target_loss) / target_loss.size(0)
-        m_module_loss   = LossPredLoss(pred_loss, target_loss, margin=MARGIN)
-        loss            = m_backbone_loss + WEIGHT * m_module_loss
+            m_backbone_loss = torch.sum(target_loss) / target_loss.size(0)
+            #---------------------------------LossPredLoss---------------------------------
+            m_module_loss   = LossPredLoss(pred_loss, target_loss, margin=MARGIN)
+            loss            = m_backbone_loss + WEIGHT * m_module_loss
 
-        loss.backward()
-        optimizers['backbone'].step()
-        optimizers['module'].step()
-
-        #--------------------------------Visualize--------------------------------
-        if (iters % 100 == 0) and (vis != None) and (plot_data != None):
-            plot_data['X'].append(iters)
-            plot_data['Y'].append([
-                m_backbone_loss.item(),
-                m_module_loss.item(),
-                loss.item()
-            ])
-            vis.line(
-                X=np.stack([np.array(plot_data['X'])] * len(plot_data['legend']), 1),
-                Y=np.array(plot_data['Y']),
-                opts={
-                    'title': 'Loss over Time',
-                    'legend': plot_data['legend'],
-                    'xlabel': 'Iterations',
-                    'ylabel': 'Loss',
-                    'width': 1200,
-                    'height': 390,
-                },
-                win=1
-            )
+            loss.backward()
+            optimizers['backbone'].step()
+            optimizers['module'].step()
             
 
 def test(models, dataloaders, mode='val'):
@@ -173,25 +156,39 @@ def test(models, dataloaders, mode='val'):
     
     return 100 * correct / total
 
-def train(models, criterion, optimizers,
-          schedulers, dataloaders, num_epochs,
-          epoch_loss, vis, plot_data):
+def train(models,
+          criterion,
+          optimizers,
+          schedulers,
+          dataloaders,
+          num_epochs,
+          epoch_loss,
+          vis,
+          plot_data):
     """
-    진짜 모델 훈련
+    통합중
     """
     print('>> Train a Model.')
+    
     best_acc = 0.
-    checkpoint_dir = os.path.join('./cifar10', 'train', 'weights')
+    checkpoint_dir = os.path.join('./kitti', 'train', 'weights')
+    
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
     
     for epoch in range(num_epochs):
         schedulers['backbone'].step()
         schedulers['module'].step()
-        # 위에서 정의한 함수
-        train_epoch(models, criterion,
-                    optimizers, dataloaders,
-                    epoch, epoch_loss, vis, plot_data)
+        
+        # ---------------------------------------------------EPOCH------------------------------------------------------------
+        train_epoch(models,
+                    criterion,
+                    optimizers,
+                    dataloaders,
+                    epoch,
+                    epoch_loss,
+                    vis,
+                    plot_data)
 
         # Save a checkpoint
         if False and epoch % 5 == 4:
@@ -201,10 +198,11 @@ def train(models, criterion, optimizers,
                 torch.save({
                     'epoch': epoch + 1,
                     'state_dict_backbone': models['backbone'].state_dict(),
-                    'state_dict_module': models['module'].state_dict()
-                },
-                '%s/active_resnet50_kitti.pth' % (checkpoint_dir))
+                    'state_dict_module': models['module'].state_dict()},
+                    '%s/active_ssd_kitti.pth' % (checkpoint_dir))
+                
             print('Val Acc: {:.3f} \t Best Acc: {:.3f}'.format(acc, best_acc))
+            
     print('>> Finished.')
     
     
@@ -240,47 +238,96 @@ if __name__ == '__main__':
         # Initialize a labeled dataset by randomly sampling K=ADDENDUM=1,000 data points from the entire dataset.
         indices = list(range(NUM_TRAIN)) # 데이터 전체 갯수 cifar는 50000만장
         random.shuffle(indices)
-        # 라벨링 유무
+        
+        # 1.
         labeled_set = indices[:ADDENDUM]
         unlabeled_set = indices[ADDENDUM:]
-        # 서브샘플러로 라벨 데이터를 가져온다
-        train_loader = DataLoader(kitti_train, batch_size=BATCH, 
-                                  sampler=SubsetRandomSampler(labeled_set), 
-                                  pin_memory=True)
         
-        test_loader  = DataLoader(kitti_test, batch_size=BATCH)
+        # data load and transform
+        # https://pytorch.org/docs/stable/data.html
+        train_params = {"batch_size": BATCH,
+                        "shuffle": True,
+                        "drop_last": False,
+                        "collate_fn": collate_fn,
+                        "sampler": SubsetRandomSampler(labeled_set),
+                        "pin_memory":True}
+
+        test_params = {"batch_size": BATCH,
+                       "shuffle": False,
+                       "drop_last": False,
+                       "collate_fn": collate_fn}
+        
+        # 2.
+        # directory you download 'D:\\'
+        kitti_train = Kitti('D:\\', train=True, download=True)
+        kitti_unlabeled = Kitti('D:\\', train=True, download=True)
+        kitti_test  = Kitti('D:\\', train=False, download=True)
+
+        train_loader = DataLoader(kitti_train, **train_params)
+        test_loader = DataLoader(kitti_testt, **test_params)
+        
         dataloaders  = {'train': train_loader, 'test': test_loader}
         
-        # Model
-        # Target model
-        resnet50    = resnet.ResNet50(num_classes=9).cuda() #kitti는 9개 클래스로 오브젝트 디텍션 진행
-        # Loss model
-        loss_module = lossnet2.LossNet().cuda() # lossnet을 위한 feature 빼오는 부분
+        # ------------------------------------------------------------------------------------------>
         
-        models      = {'backbone': resnet50, 'module': loss_module}
+        
+        # 3.
+        # backbone
+        ssd_model = SSD(backbone=ResNet(), num_classes= 9).cuda()
+        ssd_model = DDP(ssd_model)
+        # Loss model
+        loss_module = lossnet.LossNet().cuda() # lossnet을 위한 feature 빼오는 부분
+        
+        models      = {'backbone': ssd_model, 'module': loss_module}
         
         torch.backends.cudnn.benchmark = False
-
-        # Active learning cycles # config에서 10번으로 잡음 - 1000x10 = 10000개까지 데이터 라벨이 들어감
+        
+        
+        # 4.
+        # Active learning cycles 
+        # config에서 10번으로 잡음 - 1000x10 = 10000개까지 데이터 라벨이 들어감
         for cycle in range(CYCLES):
-            # Loss, criterion and scheduler (re)initialization
-            criterion      = nn.CrossEntropyLoss(reduction='none')
-            # object detection일 경우 loss 식 바꿔야함
-            
-            
-            optim_backbone = optim.SGD(models['backbone'].parameters(), lr=LR, 
-                                    momentum=MOMENTUM, weight_decay=WDECAY)
-            optim_module   = optim.SGD(models['module'].parameters(), lr=LR, 
-                                    momentum=MOMENTUM, weight_decay=WDECAY)
-            
-            sched_backbone = lr_scheduler.MultiStepLR(optim_backbone, milestones=MILESTONES)
-            sched_module   = lr_scheduler.MultiStepLR(optim_module, milestones=MILESTONES)
+            # ------------------------------------------------------------------------------------------>
+            lr = LR * (BATCH / 32) 
+            dboxes = generate_dboxes(model="ssd")
+            encoder = Encoder(dboxes)
+            criterion = Loss(dboxes)
 
+            optim_backbone = torch.optim.SGD(models['backbone'].parameters(),
+                                             lr=lr,
+                                             momentum=MOMENTUM,
+                                             weight_decay=WDECAY,
+                                             nesterov=True)
+            
+            optim_module = torch.optim.SGD(models['module'].parameters(),
+                                           lr=lr,
+                                           momentum=MOMENTUM,
+                                           weight_decay=WDECAY,
+                                           nesterov=True)
+            
+            sched_backbone = lr_scheduler.MultiStepLR(optimizer=optimizer,
+                                                      milestones=MILESTONES,
+                                                      gamma=0.1)
+            
+            sched_module = lr_scheduler.MultiStepLR(optimizer=optimizer,
+                                                    milestones=MILESTONES,
+                                                    gamma=0.1)
+            
             optimizers = {'backbone': optim_backbone, 'module': optim_module}
             schedulers = {'backbone': sched_backbone, 'module': sched_module}
-
+                
+            ##---------------------------------------------------TRAIN------------------------------------------------
             # Training and test
-            train(models, criterion, optimizers, schedulers, dataloaders, EPOCH, EPOCHL, vis, plot_data)
+            # SGD ref에서 가져와야 함 from src.process import train
+            train(models,
+                  criterion,
+                  optimizers,
+                  schedulers,
+                  dataloaders,
+                  EPOCH,
+                  EPOCHL,
+                  vis,
+                  plot_data)
             
             acc = test(models, dataloaders, mode='test')
             
@@ -290,6 +337,8 @@ if __name__ == '__main__':
                                                                                         CYCLES,
                                                                                         len(labeled_set),
                                                                                         acc))
+
+            
 
             ##
             #  Update the labeled dataset via loss prediction-based uncertainty measurement
