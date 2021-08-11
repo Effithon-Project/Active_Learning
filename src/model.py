@@ -1,10 +1,10 @@
 """
-@author: Viet Nguyen <nhviet1009@gmail.com>
-modified by Jungyeon
+KITTI-dataset
 """
 import torch
 import torch.nn as nn
 from torchvision.models.resnet import resnet50
+# from torchvision.models.mobilenet import mobilenet_v2, InvertedResidual
 
 class Base(nn.Module):
     def __init__(self):
@@ -43,8 +43,9 @@ class ResNet(nn.Module):
         x = self.feature_extractor(x)
         return x
 
+
 class SSD(Base):
-    def __init__(self, backbone=ResNet(), num_classes=9):
+    def __init__(self, backbone=ResNet(), num_classes=81):
         super().__init__()
 
         self.feature_extractor = backbone
@@ -91,17 +92,11 @@ class SSD(Base):
 
 
     def forward(self, x):
-        """
-        로스넷을 위한 feature extraction 부분 필요
-        """
         x = self.feature_extractor(x)
         detection_feed = [x]
         for l in self.additional_blocks:
             x = l(x)
             detection_feed.append(x)
         locs, confs = self.bbox_view(detection_feed, self.loc, self.conf)
-        
-        #--------------------------------------------------------------------
-        features = 0
-        
-        return locs, confs, features # lossnet을 위한 추가 내용이 필요 
+        return locs, confs
+

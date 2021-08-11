@@ -1,5 +1,5 @@
 """
-@author: Viet Nguyen <nhviet1009@gmail.com>
+KITTI-dataset
 """
 import torch
 import torch.nn as nn
@@ -19,8 +19,7 @@ class Loss(nn.Module):
         self.scale_wh = 1.0 / dboxes.scale_wh
 
         self.sl1_loss = nn.SmoothL1Loss(reduce=False)
-        self.dboxes = nn.Parameter(dboxes(order="xywh").transpose(0, 1).unsqueeze(dim=0),
-                                   requires_grad=False)
+        self.dboxes = nn.Parameter(dboxes(order="xywh").transpose(0, 1).unsqueeze(dim=0), requires_grad=False)
         self.con_loss = nn.CrossEntropyLoss(reduce=False)
 
     def loc_vec(self, loc):

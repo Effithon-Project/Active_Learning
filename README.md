@@ -3,7 +3,7 @@
 # Active Learning for EFFICIENT Learning
 ## Goals
 1. SSD(ResNet50) + Kitti(Object detection) + Learning loss
-    - base paper code [Github](github.com/Mephisto405/Learning-Loss-for-Active-Learning)
+    - base paper code [Github](https://github.com/Mephisto405/Learning-Loss-for-Active-Learning)
     - ssd code [Github](https://github.com/uvipen/SSD-pytorch)
     - issue
         - (08.06) kitti preprocessing
