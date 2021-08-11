@@ -3,12 +3,12 @@ KITTI-dataset
 """
 import os
 import shutil
-from argparse import ArgumentParser
+# from argparse import ArgumentParser
 
 import torch
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 from src.model import SSD, ResNet 
 from src.utils import generate_dboxes, Encoder, kitti_classes
@@ -22,6 +22,12 @@ import torchvision.transforms as T
 
 import warnings
 warnings.filterwarnings("ignore")
+#----------------------------------------------------------
+
+
+
+
+
 
 def main():
 
@@ -69,6 +75,8 @@ def main():
                                 nesterov=True)
     
     scheduler = MultiStepLR(optimizer=optimizer, milestones=[43, 54], gamma=0.1)
+    
+    #------------------------------ref 1에서 train으로 넘어가는 부분
 
     if torch.cuda.is_available():
         model.cuda()

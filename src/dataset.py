@@ -11,7 +11,7 @@ def collate_fn(batch):
     image, image_id, (height, width), boxes, labels
     """
     items = list(zip(*batch))
-    print(items)
+#     print(items)
     
     items[0] = default_collate([i for i in items[0] if torch.is_tensor(i)]) # tensor
     
@@ -56,7 +56,7 @@ class KittiDataset(Kitti):
         
     @property            
     def _raw_folder(self):
-        print(os.path.join(self.root, "Kitti", "raw"))
+#         print(os.path.join(self.root, "Kitti", "raw"))
         return os.path.join(self.root, "Kitti", "raw")
 
         
