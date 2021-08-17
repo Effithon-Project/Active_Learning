@@ -2,6 +2,8 @@
 
 # Active Learning for EFFICIENT Learning
 ## Goals
+0. Confidence 기반 구현 먼저(08.18)
+
 1. SSD(ResNet50) + Kitti(Object detection) + Learning loss
     - base paper code [Github](https://github.com/Mephisto405/Learning-Loss-for-Active-Learning)
     - ssd code [Github](https://github.com/uvipen/SSD-pytorch)

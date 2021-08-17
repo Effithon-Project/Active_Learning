@@ -119,13 +119,56 @@ class SSDTransformer(object):
         
         self.img_trans = transforms.Compose([
             transforms.Resize(self.size),
-            transforms.ColorJitter(brightness=0.125, contrast=0.5, saturation=0.5, hue=0.05),
+#             transforms.ColorJitter(brightness=0.125, contrast=0.5, saturation=0.5, hue=0.05),
             transforms.ToTensor(),
             self.normalize
         ])
         
         self.trans_val = transforms.Compose([
             transforms.Resize(self.size),
+            transforms.ToTensor(),
+            self.normalize
+        ])
+
+    def __call__(self, img, img_size, bboxes=None, labels=None, max_num=200):
+        
+#         if self.val:
+#             bbox_out = torch.zeros(max_num, 4)
+#             label_out = torch.zeros(max_num, dtype=torch.long)
+#             bbox_out[:bboxes.size(0), :] = bboxes
+#             label_out[:labels.size(0)] = labels
+#             return self.trans_val(img), img_size, bbox_out, label_out
+
+        img, img_size, bboxes, labels = self.crop(img, img_size, bboxes, labels)
+        img, bboxes = self.hflip(img, bboxes)
+
+        img = self.img_trans(img).contiguous()
+        
+        bboxes, labels = self.encoder.encode(bboxes, labels)
+
+        return img, img_size, bboxes, labels
+
+class SSDTransformer_(object):
+    def __init__(self, dboxes, size=(300, 300), val=False):
+        self.size = size
+        self.val = val
+        self.dboxes = dboxes
+        self.encoder = Encoder(self.dboxes)
+        self.crop = SSDCropping()
+
+        self.hflip = RandomHorizontalFlip()
+        
+        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                              std=[0.229, 0.224, 0.225])
+        
+        self.img_trans = transforms.Compose([
+#             transforms.Resize(self.size),
+            transforms.ToTensor(),
+            self.normalize
+        ])
+        
+        self.trans_val = transforms.Compose([
+#             transforms.Resize(self.size),
             transforms.ToTensor(),
             self.normalize
         ])

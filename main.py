@@ -6,7 +6,7 @@ Reference:
 import os
 import random
 import numpy as np
-import visdom
+# import visdom
 from tqdm import tqdm
 import shutil
 #data loader
@@ -25,7 +25,7 @@ import torchvision.models as models
 from torchvision.datasets import Kitti 
 # custom utils from base code
 # import models.resnet as resnet
-import models.lossnet as lossnet
+import src.lossnet as lossnet
 from config import *
 from data.sampler import SubsetSequentialSampler 
 #----------------------------------------------------------
@@ -110,14 +110,16 @@ def train_epoch(models,
 
 
     for i, (img, _, _, gloc, glabel) in enumerate(progress_bar):
-        if torch.cuda.is_available():
-            img = img.cuda()
-            gloc = gloc.cuda() # gt localization
-            glabel = glabel.cuda() # gt label
+#         if torch.cuda.is_available():
+        img = img.cuda()
+        gloc = gloc.cuda() # gt localization
+        glabel = glabel.cuda() # gt label
 #         iters += 1
         # 수정 필요! features가 나오도록
         # locs, confs // predicted localization, predicted label
 #         ploc, plabel, features = models['backbone'](img)
+        
+#         print(models['backbone'])
         ploc, plabel = models['backbone'](img)
         ploc, plabel = ploc.float(), plabel.float()
         gloc = gloc.transpose(1, 2).contiguous()
@@ -175,8 +177,8 @@ def train(models,
           dataloaders,
           num_epochs,
           epoch_loss,
-          vis,
-          plot_data):
+          vis=None,
+          plot_data=None):
     """
     통합중
     train(models,
@@ -201,7 +203,7 @@ def train(models,
 #         schedulers['backbone'].step()
 #         schedulers['module'].step()
         
-        # ---------------------------------------------------EPOCH------------------------------------------------------------
+        # -----------------EPOCH------------------------------------------------------------
         train_epoch(models,
                     dataloaders,
                     epoch,
@@ -253,7 +255,7 @@ def get_uncertainty(models, unlabeled_loader):
 
 if __name__ == '__main__':
     # 시각화
-    vis = visdom.Visdom(server='http://localhost', port=9000)
+#     vis = visdom.Visdom(server='http://localhost', port=9000)
     plot_data = {'X': [], 'Y': [], 'legend': ['Backbone Loss', 'Module Loss', 'Total Loss']}
 
     for trial in range(TRIALS):
@@ -283,9 +285,15 @@ if __name__ == '__main__':
         dboxes = generate_dboxes(model="ssd")
         encoder = Encoder(dboxes)
         # directory you download 'D:\\'
-        kitti_train = KittiDataset("D:\\", train=True, transform=SSDTransformer(dboxes, (300, 300),val=False))
-        kitti_unlabeled = KittiDataset("D:\\", train=True, transform=SSDTransformer(dboxes, (300, 300),val=False))
-        kitti_test  = KittiDataset("D:\\", train=False, transform=SSDTransformer(dboxes, (300, 300),val=False))
+        kitti_train = KittiDataset("D:\\", train=True,
+                                   transform=SSDTransformer(dboxes, (300, 300),val=False))
+        
+        print()
+        
+        kitti_unlabeled = KittiDataset("D:\\", train=True,
+                                       transform=SSDTransformer(dboxes, (300, 300),val=False))
+        kitti_test  = KittiDataset("D:\\", train=False,
+                                   transform=SSDTransformer(dboxes, (300, 300),val=False))
 
         train_loader = DataLoader(kitti_train, **train_params)
         test_loader = DataLoader(kitti_test, **test_params)
@@ -295,7 +303,7 @@ if __name__ == '__main__':
         # 3.
         
         # backbone
-        model = SSD(backbone=ResNet(), num_classes=len(kitti_classes))
+        model = SSD(backbone=ResNet(), num_classes=len(kitti_classes)).cuda()
         
         
         # Loss model
@@ -313,7 +321,7 @@ if __name__ == '__main__':
         for cycle in range(CYCLES):
             LR=2.6e-3
             LR = LR * (BATCH / 32)
-            criterion = Loss(dboxes)
+            criterion = Loss(dboxes).cuda()
 #             dboxes = generate_dboxes(model="ssd")
 #             encoder = Encoder(dboxes)
 #             criterion = Loss(dboxes)
@@ -352,9 +360,9 @@ if __name__ == '__main__':
                   schedulers,
                   dataloaders,
                   EPOCH,
-                  EPOCHL,
-                  vis,
-                  plot_data)
+                  EPOCHL)
+#                   vis,
+#                   plot_data)
             
 #             acc = test(models, dataloaders, mode='test')
             
