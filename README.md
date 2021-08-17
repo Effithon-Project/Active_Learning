@@ -14,7 +14,7 @@
         
     ![plan](./img/plan.png)
 
-2. new IDEA!!
+2. 
 
 
 ---

@@ -120,17 +120,22 @@ def train_epoch(models,
 #         ploc, plabel, features = models['backbone'](img)
         
 #         print(models['backbone'])
-        ploc, plabel = models['backbone'](img)
+        ploc, plabel, lossnet_loss = models['backbone'](img)
         ploc, plabel = ploc.float(), plabel.float()
         gloc = gloc.transpose(1, 2).contiguous()
-        loss = criterion(ploc, plabel, gloc, glabel)
+        loss = criterion(ploc, plabel, gloc, glabel) # batch max loss sorting
         # scores, features = models['backbone'](inputs)
 
-#         #---------------------------------------------------수정 필요! features가 나오도록
+#         
 #         scores = loss
 #         target_loss = criterion(scores, labels)
 
 #         pred_loss = models['module'](features)
+        pred_loss = lossnet_loss
+#         print(loss.size())
+#         print(pred_loss.size())
+#         print(pred_loss)
+#         print(pred_loss.size()) torch.Size([2, 9, 8732])
 #         pred_loss = pred_loss.view(pred_loss.size(0))
 
 #         m_backbone_loss = torch.sum(target_loss) / target_loss.size(0)
@@ -288,7 +293,6 @@ if __name__ == '__main__':
         kitti_train = KittiDataset("D:\\", train=True,
                                    transform=SSDTransformer(dboxes, (300, 300),val=False))
         
-        print()
         
         kitti_unlabeled = KittiDataset("D:\\", train=True,
                                        transform=SSDTransformer(dboxes, (300, 300),val=False))
@@ -307,7 +311,7 @@ if __name__ == '__main__':
         
         
         # Loss model
-        #-------------------TODO--------------------------
+        #---------------------------------TODO----------------------------
         loss_module = lossnet.LossNet().cuda() # lossnet을 위한 feature 빼오는 부분
         
         models      = {'backbone': model, 'module': loss_module}
