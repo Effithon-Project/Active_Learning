@@ -9,12 +9,13 @@ import numpy as np
 # import visdom
 from tqdm import tqdm
 import shutil
-#data loader
+
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 # nn
 import torch
 import torch.nn as nn
+
 # learning
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
@@ -23,17 +24,15 @@ from torch.optim.lr_scheduler import MultiStepLR
 import torchvision.transforms as T
 import torchvision.models as models
 from torchvision.datasets import Kitti 
+
 # custom utils from base code
-# import models.resnet as resnet
-import src.lossnet as lossnet
 from config import *
-from data.sampler import SubsetSequentialSampler 
-#----------------------------------------------------------
+import src.lossnet as lossnet
+from src.sampler import SubsetSequentialSampler 
 from src.transform import SSDTransformer
 from src.model import SSD, ResNet
 from src.utils import generate_dboxes, Encoder, kitti_classes
 from src.loss import Loss
-# from src.process import train, evaluate
 from src.dataset import collate_fn, KittiDataset
 
 import warnings
