@@ -33,7 +33,7 @@ from src.transform import SSDTransformer
 from src.model import SSD, ResNet
 from src.utils import generate_dboxes, Encoder, kitti_classes
 from src.loss import Loss
-from src.process import train, evaluate
+# from src.process import train, evaluate
 from src.dataset import collate_fn, KittiDataset
 
 import warnings
@@ -89,15 +89,6 @@ def train_epoch(models,
     """
     이 부분이 SSD랑 통합하는데 가장 중요한 부분
     ref 2의 train.py 많이 참고
-    train_epoch(models,
-                dataloaders,
-                epoch,
-                epoch_loss,
-                criterion,
-                optimizers,
-                schedulers,
-                vis,
-                plot_data)
     """
     schedulers['backbone'].step()
     schedulers['module'].step()
@@ -120,35 +111,25 @@ def train_epoch(models,
 #         ploc, plabel, features = models['backbone'](img)
         
 #         print(models['backbone'])
-        ploc, plabel, lossnet_loss = models['backbone'](img)
+        ploc, plabel, out_dict = models['backbone'](img)
         ploc, plabel = ploc.float(), plabel.float()
         gloc = gloc.transpose(1, 2).contiguous()
-        loss = criterion(ploc, plabel, gloc, glabel) # batch max loss sorting
-        # scores, features = models['backbone'](inputs)
-
-#         
-#         scores = loss
-#         target_loss = criterion(scores, labels)
-
-#         pred_loss = models['module'](features)
-        pred_loss = lossnet_loss
-#         print(loss.size())
-#         print(pred_loss.size())
-#         print(pred_loss)
-#         print(pred_loss.size()) torch.Size([2, 9, 8732])
+        loss = criterion(ploc, plabel, gloc, glabel) # batch max loss sorting 
+        
+        features = out_dict
+        pred_loss = models['module'](features) 
 #         pred_loss = pred_loss.view(pred_loss.size(0))
 
 #         m_backbone_loss = torch.sum(target_loss) / target_loss.size(0)
-#         #---------------------------------LossPredLoss---------------------------------
+#         #----------------------LossPredLoss---------------------------
 #         m_module_loss   = LossPredLoss(pred_loss, target_loss, margin=MARGIN)
 #         loss            = m_backbone_loss + WEIGHT * m_module_loss
-#         #----------------------------------------------------이구간
 
         
         progress_bar.set_description("Epoch: {}. Loss: {:.5f}".format(epoch + 1, loss.item()))
         loss.backward()
         optimizers['backbone'].step()
-#         optimizers['module'].step()
+        optimizers['module'].step()
             
 
 # def test(models, dataloaders, mode='val'):
@@ -184,22 +165,11 @@ def train(models,
           epoch_loss,
           vis=None,
           plot_data=None):
-    """
-    통합중
-    train(models,
-          criterion,
-          optimizers,
-          schedulers,
-          dataloaders,
-          EPOCH,
-          EPOCHL,
-          vis,
-          plot_data)
-    """
+
     print('>> Train a Model.')
     
     best_acc = 0.
-    checkpoint_dir = os.path.join('./kitti', 'train', 'weights')
+    checkpoint_dir = os.path.join('./ckpt', 'train', 'weights')
     
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
@@ -208,7 +178,7 @@ def train(models,
 #         schedulers['backbone'].step()
 #         schedulers['module'].step()
         
-        # -----------------EPOCH------------------------------------------------------------
+        # -----------------EPOCH--------------------------
         train_epoch(models,
                     dataloaders,
                     epoch,

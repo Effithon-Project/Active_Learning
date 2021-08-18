@@ -62,7 +62,7 @@ class SSD(Base):
         self.feature_extractor = backbone
         self.num_classes = num_classes
         self._build_additional_features(self.feature_extractor.out_channels)
-        self._build_additional_features_4loss(self.feature_extractor.out_channels)
+#         self._build_additional_features_4loss(self.feature_extractor.out_channels)
         self.num_defaults = [4, 6, 6, 6, 4, 4]
         self.loc = []
         self.conf = []
@@ -71,12 +71,9 @@ class SSD(Base):
         for nd, oc in zip(self.num_defaults, self.feature_extractor.out_channels):
             self.loc.append(nn.Conv2d(oc, nd * 4, kernel_size=3, padding=1))
             self.conf.append(nn.Conv2d(oc, nd * self.num_classes, kernel_size=3, padding=1))
-            self.loss.append(nn.Conv2d(oc, nd * 1, kernel_size=3, padding=1)) ##
-#             print(self.loss)
-
+#             self.loss.append(nn.Conv2d(oc, nd * 1, kernel_size=3, padding=1)) 
         self.loc = nn.ModuleList(self.loc)
         self.conf = nn.ModuleList(self.conf)
-        self.loss = nn.ModuleList(self.loss) ##
         self.init_weights()
 
     def _build_additional_features(self, input_size):
@@ -105,34 +102,6 @@ class SSD(Base):
             self.additional_blocks.append(layer)
 
         self.additional_blocks = nn.ModuleList(self.additional_blocks)
-        
-    def _build_additional_features_4loss(self, input_size):
-        self.additional_blocks_4loss = []
-        for i, (input_size, output_size, channels) in enumerate(
-                zip(input_size[:-1], input_size[1:], [256, 256, 128, 128, 128])):
-#             print(input_size, output_size, channels)
-            if i < 3:
-                layer = nn.Sequential(
-                    nn.Conv2d(input_size, channels, kernel_size=1, bias=False),
-                    nn.BatchNorm2d(channels),
-                    nn.ReLU(inplace=True),
-                    nn.Conv2d(channels, output_size, kernel_size=3, padding=1, stride=2, bias=False),
-                    nn.BatchNorm2d(output_size),
-                    nn.ReLU(inplace=True),
-                )
-            else:
-                layer = nn.Sequential(
-                    nn.Conv2d(input_size, channels, kernel_size=1, bias=False),
-                    nn.BatchNorm2d(channels),
-                    nn.ReLU(inplace=True),
-                    nn.Conv2d(channels, output_size, kernel_size=3, bias=False),
-                    nn.BatchNorm2d(output_size),
-                    nn.ReLU(inplace=True),
-                )
-
-            self.additional_blocks_4loss.append(layer)
-
-        self.additional_blocks_4loss = nn.ModuleList(self.additional_blocks_4loss)
 
 
     def forward(self, x):
@@ -140,20 +109,14 @@ class SSD(Base):
         x2 = x
         detection_feed = [x]
         
-        for l in self.additional_blocks:
+        # out 1,2,3,4,5
+        out_dict = {}
+        for i, l in enumerate(self.additional_blocks):
+            out_dict[i] = x
             x = l(x)
             detection_feed.append(x)
-#         print(detection_feed)
-        locs, confs = self.bbox_view(detection_feed, self.loc, self.conf)
-    
-        #-----------LOSSNET-----------------
-#         x2 = self.feature_extractor(x)
-        detection_feed2 = [x2]
-        for l2 in self.additional_blocks_4loss:
-#             print(l2)
-            x2 = l2(x2)
-            detection_feed2.append(x2)
-        losses = self.loss_net(detection_feed2, self.loss)
         
-        return locs, confs, losses
+        locs, confs = self.bbox_view(detection_feed, self.loc, self.conf)
+        
+        return locs, confs, out_dict
 
