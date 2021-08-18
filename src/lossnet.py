@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 class LossNet(nn.Module):
     def __init__(self, feature_sizes=[32, 16, 8, 4, 2],
-                 num_channels=[32, 64, 128, 256, 512], interm_dim=128):
+                 num_channels=[16, 32, 64,128, 256], interm_dim=128):
         
         super(LossNet, self).__init__()
         
@@ -24,13 +24,12 @@ class LossNet(nn.Module):
         self.FC2 = nn.Linear(num_channels[1], interm_dim) # 128->128
         self.FC3 = nn.Linear(num_channels[2], interm_dim) # 256->128
         self.FC4 = nn.Linear(num_channels[3], interm_dim) # 512->128
-        self.FC4 = nn.Linear(num_channels[4], interm_dim) # 512->128
+        self.FC5 = nn.Linear(num_channels[4], interm_dim) # 512->128
 
 
-        self.linear = nn.Linear(4 * interm_dim, 1) # 4x128 = 512 -> 1
+        self.linear = nn.Linear(5 * interm_dim, 1) # 4x128 = 512 -> 1
     
     def forward(self, features):
-        print(features[0].size())
         
         out1 = self.GAP1(features[0]) # 32
         out1 = out1.view(out1.size(0), -1)
@@ -48,8 +47,8 @@ class LossNet(nn.Module):
         out4 = out4.view(out4.size(0), -1)
         out4 = F.relu(self.FC4(out4))
         
-        out5 = self.GAP4(features[4]) # 5
-        out5 = out4.view(out5.size(0), -1)
+        out5 = self.GAP5(features[4]) # 5
+        out5 = out5.view(out5.size(0), -1)
         out5 = F.relu(self.FC5(out5))
         
         # concat 해야해서 interm_dim을 가짐

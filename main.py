@@ -85,45 +85,37 @@ def train_epoch(models,
                 schedulers,
                 vis=None,
                 plot_data=None):
-    """
-    이 부분이 SSD랑 통합하는데 가장 중요한 부분
-    ref 2의 train.py 많이 참고
-    """
-    schedulers['backbone'].step()
-    schedulers['module'].step()
+    
+#     schedulers['backbone'].step()
+#     schedulers['module'].step()
     
     models['backbone'].train()
-#     models['module'].train()
+    models['module'].train()
     train_loader = dataloaders['train']
     num_iter_per_epoch = len(train_loader)
     progress_bar = tqdm(train_loader)
 
 
     for i, (img, _, _, gloc, glabel) in enumerate(progress_bar):
-#         if torch.cuda.is_available():
         img = img.cuda()
         gloc = gloc.cuda() # gt localization
         glabel = glabel.cuda() # gt label
-#         iters += 1
-        # 수정 필요! features가 나오도록
+
         # locs, confs // predicted localization, predicted label
-#         ploc, plabel, features = models['backbone'](img)
-        
-#         print(models['backbone'])
         ploc, plabel, out_dict = models['backbone'](img)
         ploc, plabel = ploc.float(), plabel.float()
         gloc = gloc.transpose(1, 2).contiguous()
-        loss = criterion(ploc, plabel, gloc, glabel) # batch max loss sorting 
+        target_loss = criterion(ploc, plabel, gloc, glabel) # batch max loss sorting 
         
         features = out_dict
         pred_loss = models['module'](features) 
-#         pred_loss = pred_loss.view(pred_loss.size(0))
-
-#         m_backbone_loss = torch.sum(target_loss) / target_loss.size(0)
-#         #----------------------LossPredLoss---------------------------
-#         m_module_loss   = LossPredLoss(pred_loss, target_loss, margin=MARGIN)
-#         loss            = m_backbone_loss + WEIGHT * m_module_loss
-
+        pred_loss = pred_loss.view(pred_loss.size(0))
+        
+        m_backbone_loss = torch.sum(target_loss) / target_loss.size(0)
+        
+        #----------------------LossPredLoss---------------------------
+        m_module_loss   = LossPredLoss(pred_loss, target_loss, margin=MARGIN)
+        loss            = m_backbone_loss + WEIGHT * m_module_loss
         
         progress_bar.set_description("Epoch: {}. Loss: {:.5f}".format(epoch + 1, loss.item()))
         loss.backward()
@@ -174,8 +166,8 @@ def train(models,
         os.makedirs(checkpoint_dir)
     
     for epoch in range(num_epochs):
-#         schedulers['backbone'].step()
-#         schedulers['module'].step()
+        schedulers['backbone'].step()
+        schedulers['module'].step()
         
         # -----------------EPOCH--------------------------
         train_epoch(models,
@@ -224,11 +216,11 @@ def get_uncertainty(models, unlabeled_loader):
 
             uncertainty = torch.cat((uncertainty, pred_loss), 0)
     
-    return uncertainty.cpu() #??
+    return uncertainty.cpu()
 
 
 if __name__ == '__main__':
-    # 시각화
+
 #     vis = visdom.Visdom(server='http://localhost', port=9000)
     plot_data = {'X': [], 'Y': [], 'legend': ['Backbone Loss', 'Module Loss', 'Total Loss']}
 
@@ -237,7 +229,6 @@ if __name__ == '__main__':
         indices = list(range(NUM_TRAIN)) # 데이터 전체 갯수 cifar는 50000만장
         random.shuffle(indices)
         
-        # 1.
         labeled_set = indices[:ADDENDUM]
         unlabeled_set = indices[ADDENDUM:]
         
@@ -273,31 +264,24 @@ if __name__ == '__main__':
         
         dataloaders  = {'train': train_loader, 'test': test_loader}        
         
-        # 3.
-        
         # backbone
         model = SSD(backbone=ResNet(), num_classes=len(kitti_classes)).cuda()
         
-        
         # Loss model
-        #---------------------------------TODO----------------------------
         loss_module = lossnet.LossNet().cuda() # lossnet을 위한 feature 빼오는 부분
         
         models      = {'backbone': model, 'module': loss_module}
         
         torch.backends.cudnn.benchmark = False
         
-        
-        # 4.
         # Active learning cycles 
-        # config에서 10번으로 잡음 - 1000x10 = 10000개까지 데이터 라벨이 들어감
+        # config에서 10번으로 잡음
         for cycle in range(CYCLES):
+            
             LR=2.6e-3
             LR = LR * (BATCH / 32)
             criterion = Loss(dboxes).cuda()
-#             dboxes = generate_dboxes(model="ssd")
-#             encoder = Encoder(dboxes)
-#             criterion = Loss(dboxes)
+
             MOMENTUM = 0.9
             WEIGHT_DECAY = 0.0005
         
@@ -324,9 +308,8 @@ if __name__ == '__main__':
             optimizers = {'backbone': optim_backbone, 'module': optim_module}
             schedulers = {'backbone': sched_backbone, 'module': sched_module}
                 
-            ##---------------------------------------------------TRAIN------------------------------------------------
+            ##---------------------------------TRAIN--------------------------------------
             # Training and test
-            # SGD ref에서 가져와야 함 from src.process import train
             train(models,
                   criterion,
                   optimizers,
@@ -348,7 +331,6 @@ if __name__ == '__main__':
 
             
 
-            ##
             #  Update the labeled dataset via loss prediction-based uncertainty measurement
             # 모델에 추가적으로 라벨을 넣어줄 부분
             # Randomly sample 10000 unlabeled data points
@@ -363,9 +345,6 @@ if __name__ == '__main__':
                             "pin_memory":True}
             
             unlabeled_loader = DataLoader(kitti_unlabeled, **unlabeled_params)
-#             unlabeled_loader = DataLoader(cifar10_unlabeled, batch_size=BATCH, 
-#                                           sampler=SubsetSequentialSampler(subset), 
-#                                           pin_memory=True)
 
             # Measure uncertainty of each data points in the subset
             # 이 부분이 data selection이 일어나는 부분

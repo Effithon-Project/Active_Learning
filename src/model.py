@@ -33,8 +33,7 @@ class Base(nn.Module):
             ret.append((l(s).view(s.size(0), 1, -1)))
 
         losses = list(ret)
-#         print(losses)
-        losses = torch.cat(losses, 2).contiguous() # Torch.Size([2, 1, 8732])
+        losses = torch.cat(losses, 2).contiguous()
         return losses
 
 
