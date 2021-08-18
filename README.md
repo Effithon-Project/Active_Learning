@@ -1,4 +1,15 @@
-﻿**jungyeon working directory**
+**jungyeon working directory**
+## Setting Virtual Environment with Anaconda
+
+`conda create -n [VIR_ENV_NAME] python==3.8`
+
+`conda activate [VIR_ENV_NAME]`
+
+`pip install -r requirements.txt`
+
+`python main.py`
+
+If you can run `main.py`, the setting is done.
 
 # Active Learning for EFFICIENT Learning
 ## Goals
