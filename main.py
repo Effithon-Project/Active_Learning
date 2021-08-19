@@ -68,11 +68,15 @@ def LossPredLoss(input, target, margin=1.0, reduction='mean'):
     assert input.shape == input.flip(0).shape
     
     input = (input - input.flip(0))[:len(input)//2] 
+#     print("input",input)
+#     print(input.size())
     # [l_1 - l_2B, l_2 - l_2B-1, ... , l_B - l_B+1], where batch_size = 2B
     target = (target - target.flip(0))[:len(target)//2]
     target = target.detach()
 
     one = 2 * torch.sign(torch.clamp(target, min=0)) - 1 
+#     print("one",one)
+#     print(one.size())
     # 1 operation which is defined by the authors
     
     if reduction == 'mean':
@@ -174,7 +178,8 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
                     detections.append([img_id[idx], loc_[0] * width, loc_[1] * height, (loc_[2] - loc_[0]) * width,
                                        (loc_[3] - loc_[1]) * height, prob_,
                                        category_ids[label_ - 1]])
-
+    print("DEBUGGING")
+    print(detections[0])
     detections = np.array(detections, dtype=np.float32)
     print(detections.shape)
     print(detections.ndim)
@@ -327,7 +332,7 @@ if __name__ == '__main__':
         # config에서 10번으로 잡음
         for cycle in range(CYCLES):
             
-            LR=2.6e-3
+#             LR=2.6e-3
             LR = LR * (BATCH / 32)
             criterion = Loss(dboxes).cuda()
 
@@ -338,13 +343,13 @@ if __name__ == '__main__':
                                              lr=LR,
                                              momentum=MOMENTUM,
                                              weight_decay=WDECAY,
-                                             nesterov=True)
+                                             nesterov=False)
             
             optim_module = torch.optim.SGD(models['module'].parameters(),
                                            lr=LR,
                                            momentum=MOMENTUM,
                                            weight_decay=WDECAY,
-                                           nesterov=True)
+                                           nesterov=False)
             
             sched_backbone = MultiStepLR(optimizer=optim_backbone,
                                          milestones=MILESTONES,
@@ -370,14 +375,16 @@ if __name__ == '__main__':
 #                   plot_data)
             
             nms_threshold = 0.5
-#             acc = test(models, dataloaders, encoder, nms_threshold, mode='test')
-            
-#             print('Trial {}/{} || Cycle {}/{} || Label set size {}: Test acc {}'.format(trial+1,
-#                                                                                         TRIALS,
-#                                                                                         cycle+1,
-#                                                                                         CYCLES,
-#                                                                                         len(labeled_set),
-#                                                                                         acc))
+            acc = test(models, dataloaders, encoder, nms_threshold, mode='test')
+            acc = "not yet"
+    
+    
+            print('Trial {}/{} || Cycle {}/{} || Label set size {}: Test acc {}'.format(trial+1,
+                                                                                        TRIALS,
+                                                                                        cycle+1,
+                                                                                        CYCLES,
+                                                                                        len(labeled_set),
+                                                                                        acc))
 
             
 
