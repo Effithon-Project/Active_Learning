@@ -1,13 +1,14 @@
 ''' Configuration File.
 '''
 
-##
 # Learning Loss for Active Learning
-NUM_TRAIN = 40 # N
-NUM_VAL   = 7481 - NUM_TRAIN
+NUM_TOT   = 7481
+NUM_TEST  = 2251 # N
+NUM_TRAIN = 4930 # N
+# NUM_VAL   = 4930 - NUM_TRAIN
 BATCH     = 8 # B
-SUBSET    = 7481 # M
-ADDENDUM  = 7481 # K
+SUBSET    = 300 # M
+ADDENDUM  = 300 # K
 
 MARGIN = 1.0 # xi
 WEIGHT = 1.0 # lambda

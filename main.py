@@ -45,6 +45,19 @@ torch.manual_seed(0)
 torch.backends.cudnn.deterministic = True # reproduction을 위한 부분
 # https://pytorch.org/docs/stable/notes/randomness.html
 
+dboxes = generate_dboxes(model="ssd")
+encoder = Encoder(dboxes)
+
+kitti_tot = KittiDataset("D:\\", train=True,
+                         transform=SSDTransformer(dboxes, (300, 300),val=False))
+        
+        
+kitti_unlabeled = KittiDataset("D:\\", train=True,
+                               transform=SSDTransformer(dboxes, (300, 300),val=False))
+
+# kitti_test  = KittiDataset("D:\\", train=True,
+#                            transform=SSDTransformer(dboxes, (300, 300),val=False))
+
 
 #------------------------------Loss Prediction Loss------------------------------
 def LossPredLoss(input, target, margin=1.0, reduction='mean'):
@@ -240,13 +253,15 @@ def get_uncertainty(models, unlabeled_loader):
     uncertainty = torch.tensor([]).cuda()
 
     with torch.no_grad():
-        for (inputs, labels) in unlabeled_loader:
-            inputs = inputs.cuda()
-            # labels = labels.cuda()
+        for i, (img, _, _, gloc, glabel) in enumerate(unlabeled_loader):
+            img = img.cuda()
+            gloc = gloc.cuda() # gt localization
+            glabel = glabel.cuda() # gt label
+            
+            ploc, plabel, out_dict = models['backbone'](img)
 
-            scores, features = models['backbone'](inputs)
+            features = out_dict
             pred_loss = models['module'](features) 
-            # pred_loss = criterion(scores, labels) # ground truth loss
             pred_loss = pred_loss.view(pred_loss.size(0))
 
             uncertainty = torch.cat((uncertainty, pred_loss), 0)
@@ -260,15 +275,26 @@ if __name__ == '__main__':
     plot_data = {'X': [], 'Y': [], 'legend': ['Backbone Loss', 'Module Loss', 'Total Loss']}
 
     for trial in range(TRIALS):
-        # Initialize a labeled dataset by randomly sampling K=ADDENDUM=1,000 data points from the entire dataset.
-        indices = list(range(NUM_TRAIN)) # 데이터 전체 갯수 cifar는 50000만장
-        random.shuffle(indices)
+        # train : test = 7:3
+        tot_indices = list(range(NUM_TOT)) 
+        random.shuffle(tot_indices)
+        test_set = tot_indices[:NUM_TEST]
+        train_set = tot_indices[NUM_TEST:]
         
-        labeled_set = indices[:ADDENDUM]
-        unlabeled_set = indices[ADDENDUM:]
+        # Initialize a labeled dataset by randomly sampling K=ADDENDUM=300
+        random.shuffle(train_set)
+        
+        labeled_set = train_set[:ADDENDUM]
+        unlabeled_set = train_set[ADDENDUM:]
         
         # data load and transform
         # https://pytorch.org/docs/stable/data.html
+        
+        
+        
+        
+        # directory you download 'D:\\'
+        # train이 모두 True인 이유는 라벨이 있는 전체 풀에서 뽑기 때문
         train_params = {"batch_size": BATCH,
                         "shuffle": False, # sampler랑 같이 쓸 수 없음
                         "drop_last": False,
@@ -279,25 +305,11 @@ if __name__ == '__main__':
         test_params = {"batch_size": BATCH,
                        "shuffle": False,
                        "drop_last": False,
-                       "collate_fn": collate_fn}
-        
-        dboxes = generate_dboxes(model="ssd")
-        encoder = Encoder(dboxes)
-        
-        # directory you download 'D:\\'
-        # train이 모두 True인 이유는 라벨이 있는 전체 풀에서 뽑기 때문
-        kitti_train = KittiDataset("D:\\", train=True,
-                                   transform=SSDTransformer(dboxes, (300, 300),val=False))
-        
-        
-        kitti_unlabeled = KittiDataset("D:\\", train=True,
-                                       transform=SSDTransformer(dboxes, (300, 300),val=False))
-        
-        kitti_test  = KittiDataset("D:\\", train=True,
-                                   transform=SSDTransformer(dboxes, (300, 300),val=False))
+                       "collate_fn": collate_fn,
+                       "sampler": SubsetRandomSampler(test_set)}
 
-        train_loader = DataLoader(kitti_train, **train_params)
-        test_loader = DataLoader(kitti_test, **test_params)
+        train_loader = DataLoader(kitti_tot, **train_params)
+        test_loader = DataLoader(kitti_tot, **test_params)
         
         dataloaders  = {'train': train_loader, 'test': test_loader}        
         
@@ -358,7 +370,7 @@ if __name__ == '__main__':
 #                   plot_data)
             
             nms_threshold = 0.5
-            acc = test(models, dataloaders, encoder, nms_threshold, mode='test')
+#             acc = test(models, dataloaders, encoder, nms_threshold, mode='test')
             
 #             print('Trial {}/{} || Cycle {}/{} || Label set size {}: Test acc {}'.format(trial+1,
 #                                                                                         TRIALS,
@@ -398,14 +410,16 @@ if __name__ == '__main__':
 
             # Create a new dataloader for the updated labeled dataset
             train_params = {"batch_size": BATCH,
-                        "shuffle": False, # sampler랑 같이 쓸 수 없음
-                        "drop_last": False,
-                        "collate_fn": collate_fn,
-                        "sampler": SubsetRandomSampler(labeled_set),
-                        "pin_memory":True}
-            dataloaders['train'] = DataLoader(kitti_train, **train_params)
+                            "shuffle": False, # sampler랑 같이 쓸 수 없음
+                            "drop_last": False,
+                            "collate_fn": collate_fn,
+                            "sampler": SubsetRandomSampler(labeled_set),
+                            "pin_memory":True}
+            
+            dataloaders['train'] = DataLoader(kitti_tot, **train_params)
             print('>> Datasets are Updated.')
-        
+            print('>> LABELED:', len(labeled_set))
+            print('>> UNLABELED', len(unlabeled_set))
         # Save a checkpoint
 #         torch.save({
 #                     'trial': trial + 1,
