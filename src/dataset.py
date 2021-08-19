@@ -1,6 +1,3 @@
-"""
-KITTI-dataset
-"""
 import torch
 from torchvision.datasets import Kitti
 from torch.utils.data.dataloader import default_collate
@@ -10,9 +7,7 @@ def collate_fn(batch):
     """
     image, image_id, (height, width), boxes, labels
     """
-    items = list(zip(*batch))
-#     print(items)
-    
+    items = list(zip(*batch))    
     items[0] = default_collate([i for i in items[0] if torch.is_tensor(i)]) # tensor
     
     items[1] = list([i for i in items[1] if i]) # list
@@ -56,7 +51,6 @@ class KittiDataset(Kitti):
         
     @property            
     def _raw_folder(self):
-#         print(os.path.join(self.root, "Kitti", "raw"))
         return os.path.join(self.root, "Kitti", "raw")
 
         
@@ -119,7 +113,3 @@ class KittiDataset(Kitti):
                                                                    labels)
             
         return image, image_id, (height, width), boxes, labels
-  
-    
-# if __name__ == "__main__":
-#     KittiDataset('D:\\', mode=True)

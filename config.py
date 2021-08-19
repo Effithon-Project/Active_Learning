@@ -3,9 +3,9 @@
 
 ##
 # Learning Loss for Active Learning
-NUM_TRAIN = 7481 # N
+NUM_TRAIN = 40 # N
 NUM_VAL   = 7481 - NUM_TRAIN
-BATCH     = 4 # B
+BATCH     = 8 # B
 SUBSET    = 7481 # M
 ADDENDUM  = 7481 # K
 
@@ -15,7 +15,7 @@ WEIGHT = 1.0 # lambda
 TRIALS = 3 # 전체 실험 trial 수
 CYCLES = 10
 
-EPOCH = 10
+EPOCH = 3
 LR = 2.6e-3
 MILESTONES = [160]
 EPOCHL = 120 # After 120 epochs, stop the gradient from the loss prediction module propagated to the target model

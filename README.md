@@ -18,10 +18,9 @@ If you can run `main.py`, the setting is done.
 1. SSD(ResNet50) + Kitti(Object detection) + Learning loss
     - base paper code [Github](https://github.com/Mephisto405/Learning-Loss-for-Active-Learning)
     - ssd code [Github](https://github.com/uvipen/SSD-pytorch)
-    - issue
-        - (08.06) kitti preprocessing
-        - (08.06) loss module을 위한 feature 뽑아내기
-        - (08.03) (maybe later) https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+    - (maybe later) https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+    
+    ![](./img/code_structure.png)
         
     ![plan](./img/plan.png)
 

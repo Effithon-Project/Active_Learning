@@ -1,10 +1,6 @@
-"""
-KITTI-dataset
-"""
 import torch
 import torch.nn as nn
 from torchvision.models.resnet import resnet50
-# from torchvision.models.mobilenet import mobilenet_v2, InvertedResidual
 
 class Base(nn.Module):
     def __init__(self):
@@ -61,16 +57,13 @@ class SSD(Base):
         self.feature_extractor = backbone
         self.num_classes = num_classes
         self._build_additional_features(self.feature_extractor.out_channels)
-#         self._build_additional_features_4loss(self.feature_extractor.out_channels)
         self.num_defaults = [4, 6, 6, 6, 4, 4]
         self.loc = []
         self.conf = []
-        self.loss = [] ##
 
         for nd, oc in zip(self.num_defaults, self.feature_extractor.out_channels):
             self.loc.append(nn.Conv2d(oc, nd * 4, kernel_size=3, padding=1))
             self.conf.append(nn.Conv2d(oc, nd * self.num_classes, kernel_size=3, padding=1))
-#             self.loss.append(nn.Conv2d(oc, nd * 1, kernel_size=3, padding=1)) 
         self.loc = nn.ModuleList(self.loc)
         self.conf = nn.ModuleList(self.conf)
         self.init_weights()
@@ -105,7 +98,6 @@ class SSD(Base):
 
     def forward(self, x):
         x = self.feature_extractor(x)
-        x2 = x
         detection_feed = [x]
         
         # out 1,2,3,4,5
@@ -118,4 +110,3 @@ class SSD(Base):
         locs, confs = self.bbox_view(detection_feed, self.loc, self.conf)
         
         return locs, confs, out_dict
-

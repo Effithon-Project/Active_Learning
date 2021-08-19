@@ -86,9 +86,6 @@ def train_epoch(models,
                 vis=None,
                 plot_data=None):
     
-#     schedulers['backbone'].step()
-#     schedulers['module'].step()
-    
     models['backbone'].train()
     models['module'].train()
     train_loader = dataloaders['train']
@@ -118,20 +115,56 @@ def train_epoch(models,
         loss            = m_backbone_loss + WEIGHT * m_module_loss
         
         progress_bar.set_description("Epoch: {}. Loss: {:.5f}".format(epoch + 1, loss.item()))
+        
         loss.backward()
         optimizers['backbone'].step()
         optimizers['module'].step()
             
 
-# def test(models, dataloaders, mode='val'):
-#     """
-#     모델을 학습시킨 후  loss 구하기 위해 
-#     ref2에서는 eval
-#     evaluate(model, test_loader, epoch, encoder, nms_threshold)
-#     """
-#     assert mode == 'val' or mode == 'test'
-#     models['backbone'].eval()
-#     models['module'].eval()
+def test(models, dataloaders, encoder, nms_threshold, mode='val'):
+    """
+    evaluate(model, test_loader, encoder, nms_threshold)
+    """
+    assert mode == 'val' or mode == 'test'
+    models['backbone'].eval()
+    models['module'].eval()
+    
+    detections = []
+    category_ids = [i for i in range(9)]
+    test_loader = dataloaders['test']
+    
+    for nbatch, (img, img_id, img_size, gloc, glabel) in enumerate(test_loader):
+        print("Parsing batch: {}/{}".format(nbatch, len(test_loader)), end="\r")
+
+        img = img.cuda()
+        gloc = gloc.cuda() # gt localization
+        glabel = glabel.cuda() # gt label
+        
+        with torch.no_grad():
+            # Get predictions
+            ploc, plabel, out_dict = models['backbone'](img)
+            ploc, plabel = ploc.float(), plabel.float()
+            gloc = gloc.transpose(1, 2).contiguous()
+#             target_loss = criterion(ploc, plabel, gloc, glabel) # batch max loss sorting
+
+            for idx in range(ploc.shape[0]):
+                ploc_i = ploc[idx, :, :].unsqueeze(0)
+                plabel_i = plabel[idx, :, :].unsqueeze(0)
+                try:
+                    result = encoder.decode_batch(ploc_i, plabel_i, nms_threshold, 200)[0]
+                except:
+#                     print("No object detected in idx: {}".format(idx))
+                    continue
+
+                height, width = img_size[idx]
+                loc, label, prob = [r.cpu().numpy() for r in result]
+                for loc_, label_, prob_ in zip(loc, label, prob):
+                    detections.append([img_id[idx], loc_[0] * width, loc_[1] * height, (loc_[2] - loc_[0]) * width,
+                                       (loc_[3] - loc_[1]) * height, prob_,
+                                       category_ids[label_ - 1]])
+
+    detections = np.array(detections, dtype=np.float32)
+    print(detections)
 
 #     total = 0
 #     correct = 0
@@ -182,16 +215,17 @@ def train(models,
 
         # Save a checkpoint
         if False and epoch % 5 == 4:
-            acc = test(models, dataloaders, 'test')
-            if best_acc < acc:
-                best_acc = acc
-                torch.save({
-                    'epoch': epoch + 1,
-                    'state_dict_backbone': models['backbone'].state_dict(),
-                    'state_dict_module': models['module'].state_dict()},
-                    '%s/active_ssd_kitti.pth' % (checkpoint_dir))
+            pass
+#             acc = test(models, dataloaders, encoder, nms_threshold, mode='test')
+#             if best_acc < acc:
+#                 best_acc = acc
+#                 torch.save({
+#                     'epoch': epoch + 1,
+#                     'state_dict_backbone': models['backbone'].state_dict(),
+#                     'state_dict_module': models['module'].state_dict()},
+#                     '%s/active_ssd_kitti.pth' % (checkpoint_dir))
                 
-            print('Val Acc: {:.3f} \t Best Acc: {:.3f}'.format(acc, best_acc))
+#             print('Val Acc: {:.3f} \t Best Acc: {:.3f}'.format(acc, best_acc))
             
     print('>> Finished.')
     
@@ -246,17 +280,19 @@ if __name__ == '__main__':
                        "drop_last": False,
                        "collate_fn": collate_fn}
         
-        # 2.
         dboxes = generate_dboxes(model="ssd")
         encoder = Encoder(dboxes)
+        
         # directory you download 'D:\\'
+        # train이 모두 True인 이유는 라벨이 있는 전체 풀에서 뽑기 때문
         kitti_train = KittiDataset("D:\\", train=True,
                                    transform=SSDTransformer(dboxes, (300, 300),val=False))
         
         
         kitti_unlabeled = KittiDataset("D:\\", train=True,
                                        transform=SSDTransformer(dboxes, (300, 300),val=False))
-        kitti_test  = KittiDataset("D:\\", train=False,
+        
+        kitti_test  = KittiDataset("D:\\", train=True,
                                    transform=SSDTransformer(dboxes, (300, 300),val=False))
 
         train_loader = DataLoader(kitti_train, **train_params)
@@ -308,7 +344,7 @@ if __name__ == '__main__':
             optimizers = {'backbone': optim_backbone, 'module': optim_module}
             schedulers = {'backbone': sched_backbone, 'module': sched_module}
                 
-            ##---------------------------------TRAIN--------------------------------------
+            ##----------------------TRAIN----------------------------
             # Training and test
             train(models,
                   criterion,
@@ -320,7 +356,8 @@ if __name__ == '__main__':
 #                   vis,
 #                   plot_data)
             
-#             acc = test(models, dataloaders, mode='test')
+            nms_threshold = 0.5
+            acc = test(models, dataloaders, encoder, nms_threshold, mode='test')
             
 #             print('Trial {}/{} || Cycle {}/{} || Label set size {}: Test acc {}'.format(trial+1,
 #                                                                                         TRIALS,
@@ -340,9 +377,9 @@ if __name__ == '__main__':
             # Create unlabeled dataloader for the unlabeled subset
             # more convenient if we maintain the "order" of subset
             unlabeled_params = {"batch_size": BATCH,
-                            "collate_fn": collate_fn,
-                            "sampler": SubsetSequentialSampler(subset),
-                            "pin_memory":True}
+                                "collate_fn": collate_fn,
+                                "sampler": SubsetSequentialSampler(subset),
+                                "pin_memory":True}
             
             unlabeled_loader = DataLoader(kitti_unlabeled, **unlabeled_params)
 
@@ -363,8 +400,8 @@ if __name__ == '__main__':
             dataloaders['train'] = DataLoader(kitti_train, **train_params)
         
         # Save a checkpoint
-        torch.save({
-                    'trial': trial + 1,
-                    'state_dict_backbone': models['backbone'].state_dict(),
-                    'state_dict_module': models['module'].state_dict()},
-            './kitti/train/weights/active_resnet50_kitti_trial{}.pth'.format(trial))
+#         torch.save({
+#                     'trial': trial + 1,
+#                     'state_dict_backbone': models['backbone'].state_dict(),
+#                     'state_dict_module': models['module'].state_dict()},
+#             './kitti/train/weights/active_resnet50_kitti_trial{}.pth'.format(trial))
