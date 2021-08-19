@@ -145,7 +145,6 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
             ploc, plabel, out_dict = models['backbone'](img)
             ploc, plabel = ploc.float(), plabel.float()
             gloc = gloc.transpose(1, 2).contiguous()
-#             target_loss = criterion(ploc, plabel, gloc, glabel) # batch max loss sorting
 
             for idx in range(ploc.shape[0]):
                 ploc_i = ploc[idx, :, :].unsqueeze(0)
@@ -153,7 +152,7 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
                 try:
                     result = encoder.decode_batch(ploc_i, plabel_i, nms_threshold, 200)[0]
                 except:
-#                     print("No object detected in idx: {}".format(idx))
+                    print("No object detected in idx: {}".format(idx))
                     continue
 
                 height, width = img_size[idx]
@@ -164,7 +163,9 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
                                        category_ids[label_ - 1]])
 
     detections = np.array(detections, dtype=np.float32)
-    print(detections)
+    print(detections.shape)
+    print(detections.ndim)
+    
 
 #     total = 0
 #     correct = 0
@@ -389,15 +390,21 @@ if __name__ == '__main__':
 
             # Index in ascending order
             arg = np.argsort(uncertainty)
-            # 이 부분에 나중에 강화학습을 넣을 수 있지 않을까 기대(왜냐하면 휴리스틱하거나 mathmatics 적인 부분이니까)
+            # 나중에 강화학습을 넣을 수 있지 않을까(휴리스틱하거나 mathmatics 적인 부분이니까)
             
             # Update the labeled dataset and the unlabeled dataset, respectively
             labeled_set += list(torch.tensor(subset)[arg][-ADDENDUM:].numpy())
             unlabeled_set = list(torch.tensor(subset)[arg][:-ADDENDUM].numpy()) + unlabeled_set[SUBSET:]
 
             # Create a new dataloader for the updated labeled dataset
-            
+            train_params = {"batch_size": BATCH,
+                        "shuffle": False, # sampler랑 같이 쓸 수 없음
+                        "drop_last": False,
+                        "collate_fn": collate_fn,
+                        "sampler": SubsetRandomSampler(labeled_set),
+                        "pin_memory":True}
             dataloaders['train'] = DataLoader(kitti_train, **train_params)
+            print('>> Datasets are Updated.')
         
         # Save a checkpoint
 #         torch.save({

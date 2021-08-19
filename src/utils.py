@@ -1,6 +1,3 @@
-"""
-KITTI-dataset
-"""
 import numpy as np
 import itertools
 from math import sqrt
