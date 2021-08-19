@@ -16,9 +16,9 @@ WEIGHT = 1.0 # lambda
 TRIALS = 3 # 전체 실험 trial 수
 CYCLES = 10
 
-EPOCH = 10
-LR = 2.6e-4
-MILESTONES = [160]
+EPOCH = 1
+LR = 2.6e-3
+MILESTONES = [5]
 EPOCHL = 120 # After 120 epochs, stop the gradient from the loss prediction module propagated to the target model
 
 MOMENTUM = 0.9

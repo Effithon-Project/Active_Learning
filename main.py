@@ -54,7 +54,6 @@ kitti_tot = KittiDataset("D:\\", train=True,
 kitti_unlabeled = KittiDataset("D:\\", train=True,
                                transform=SSDTransformer(dboxes, (300, 300),val=False))
 
-#------------------------------Loss Prediction Loss------------------------------
 def LossPredLoss(input, target, margin=1.0, reduction='mean'):
     """
     base paper's core contribution
@@ -63,17 +62,13 @@ def LossPredLoss(input, target, margin=1.0, reduction='mean'):
     assert input.shape == input.flip(0).shape
     
     input = (input - input.flip(0))[:len(input)//2] 
-#     print("input",input)
-#     print(input.size())
+
     # [l_1 - l_2B, l_2 - l_2B-1, ... , l_B - l_B+1], where batch_size = 2B
     target = (target - target.flip(0))[:len(target)//2]
     target = target.detach()
 
     one = 2 * torch.sign(torch.clamp(target, min=0)) - 1 
-#     print("one",one)
-#     print(one.size())
     # 1 operation which is defined by the authors
-    
     if reduction == 'mean':
         loss = torch.sum(torch.clamp(margin - one * input, min=0))
         loss = loss / input.size(0) # Note that the size of input is already halved
@@ -85,7 +80,6 @@ def LossPredLoss(input, target, margin=1.0, reduction='mean'):
     return loss
 
 
-#------------------------------Training-------------------------------
 iters = 0
 
 def train_epoch(models,
@@ -109,12 +103,15 @@ def train_epoch(models,
         img = img.cuda()
         gloc = gloc.cuda() # gt localization
         glabel = glabel.cuda() # gt label
+        
+        optimizers['backbone'].zero_grad()
+        optimizers['module'].zero_grad()
 
         # locs, confs // predicted localization, predicted label
         ploc, plabel, out_dict = models['backbone'](img)
         ploc, plabel = ploc.float(), plabel.float()
         gloc = gloc.transpose(1, 2).contiguous()
-        target_loss = criterion(ploc, plabel, gloc, glabel) # batch max loss sorting 
+        target_loss = criterion(ploc, plabel, gloc, glabel)
         
         features = out_dict
         pred_loss = models['module'](features) 
@@ -151,41 +148,47 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
         img = img.cuda()
         gloc = gloc.cuda() # gt localization
         glabel = glabel.cuda() # gt label
-        
+        test = img_id[2]
+        print(test)
         with torch.no_grad():
             # Get predictions
             ploc, plabel, out_dict = models['backbone'](img)
             ploc, plabel = ploc.float(), plabel.float()
             gloc = gloc.transpose(1, 2).contiguous()
-
+            
+            # batch 묶음에서 하나 가져오기 idx:0,1,2,3,4,...
             for idx in range(ploc.shape[0]):
                 ploc_i = ploc[idx, :, :].unsqueeze(0)
                 plabel_i = plabel[idx, :, :].unsqueeze(0)
                 try:
-                    result = encoder.decode_batch(ploc_i, plabel_i, nms_threshold, 200)[0]
+                    result = encoder.decode_batch(ploc_i,
+                                                  plabel_i,
+                                                  nms_threshold,
+                                                  200)[0]
+                    
                 except:
                     print("No object detected in idx: {}".format(idx))
-                    continue
 
                 height, width = img_size[idx]
                 loc, label, prob = [r.cpu().numpy() for r in result]
                 
-                for loc_, label_, prob_ in zip(loc, label, prob):
+#                 for loc_, label_, prob_ in zip(loc, label, prob):
                     
-                    detections.append([img_id[idx],
-                                       loc_[0] * width,
-                                       loc_[1] * height,
-                                       (loc_[2] - loc_[0]) * width,
-                                       (loc_[3] - loc_[1]) * height,
-                                       prob_,
-                                       category_ids[label_ - 1]])
-    print("DEBUGGING\n")
-    print(len(detections))
-    
-    detections = np.array(detections, dtype=np.float32)
-    print(detections.shape) # (24221, 7)
-    print(detections.ndim) # 2
-    return len(detections)
+#                     detections.append([img_id[idx],
+#                                        loc_[0] * width,
+#                                        loc_[1] * height,
+#                                        (loc_[2] - loc_[0]) * width,
+#                                        (loc_[3] - loc_[1]) * height,
+#                                        prob_,
+#                                        category_ids[label_ - 1]])
+                    
+#                     if img_id[idx] == test:
+#                         print("detections", detections)
+
+#     print()
+#     print(len(detections))
+#     detections = np.array(detections, dtype=np.float32)
+#     return len(detections)
     
 
 
@@ -208,6 +211,7 @@ def train(models,
         os.makedirs(checkpoint_dir)
     
     for epoch in range(num_epochs):
+        
         schedulers['backbone'].step()
         schedulers['module'].step()
         
@@ -321,13 +325,13 @@ if __name__ == '__main__':
                                              lr=LR,
                                              momentum=MOMENTUM,
                                              weight_decay=WDECAY,
-                                             nesterov=False)
+                                             nesterov=True)
             
             optim_module = torch.optim.SGD(models['module'].parameters(),
                                            lr=LR,
                                            momentum=MOMENTUM,
                                            weight_decay=WDECAY,
-                                           nesterov=False)
+                                           nesterov=True)
             
             sched_backbone = MultiStepLR(optimizer=optim_backbone,
                                          milestones=MILESTONES,
