@@ -129,12 +129,12 @@ class SSDTransformer(object):
 
     def __call__(self, img, img_size, bboxes=None, labels=None, max_num=200):
         
-#         if self.val:
-#             bbox_out = torch.zeros(max_num, 4)
-#             label_out = torch.zeros(max_num, dtype=torch.long)
-#             bbox_out[:bboxes.size(0), :] = bboxes
-#             label_out[:labels.size(0)] = labels
-#             return self.trans_val(img), img_size, bbox_out, label_out
+        if self.val:
+            bbox_out = torch.zeros(max_num, 4)
+            label_out = torch.zeros(max_num, dtype=torch.long)
+            bbox_out[:bboxes.size(0), :] = bboxes
+            label_out[:labels.size(0)] = labels
+            return self.trans_val(img), img_size, bbox_out, label_out
 
         img, img_size, bboxes, labels = self.crop(img, img_size, bboxes, labels)
         img, bboxes = self.hflip(img, bboxes)

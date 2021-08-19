@@ -47,17 +47,12 @@ torch.backends.cudnn.deterministic = True # reproduction을 위한 부분
 
 dboxes = generate_dboxes(model="ssd")
 encoder = Encoder(dboxes)
-
+# directory you download 'D:\\'
 kitti_tot = KittiDataset("D:\\", train=True,
                          transform=SSDTransformer(dboxes, (300, 300),val=False))
         
-        
 kitti_unlabeled = KittiDataset("D:\\", train=True,
                                transform=SSDTransformer(dboxes, (300, 300),val=False))
-
-# kitti_test  = KittiDataset("D:\\", train=True,
-#                            transform=SSDTransformer(dboxes, (300, 300),val=False))
-
 
 #------------------------------Loss Prediction Loss------------------------------
 def LossPredLoss(input, target, margin=1.0, reduction='mean'):
@@ -174,30 +169,25 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
 
                 height, width = img_size[idx]
                 loc, label, prob = [r.cpu().numpy() for r in result]
+                
                 for loc_, label_, prob_ in zip(loc, label, prob):
-                    detections.append([img_id[idx], loc_[0] * width, loc_[1] * height, (loc_[2] - loc_[0]) * width,
-                                       (loc_[3] - loc_[1]) * height, prob_,
+                    
+                    detections.append([img_id[idx],
+                                       loc_[0] * width,
+                                       loc_[1] * height,
+                                       (loc_[2] - loc_[0]) * width,
+                                       (loc_[3] - loc_[1]) * height,
+                                       prob_,
                                        category_ids[label_ - 1]])
-    print("DEBUGGING")
-    print(detections[0])
+    print("DEBUGGING\n")
+    print(len(detections))
+    
     detections = np.array(detections, dtype=np.float32)
-    print(detections.shape)
-    print(detections.ndim)
+    print(detections.shape) # (24221, 7)
+    print(detections.ndim) # 2
+    return len(detections)
     
 
-#     total = 0
-#     correct = 0
-#     with torch.no_grad():
-#         for (inputs, labels) in dataloaders[mode]:
-#             inputs = inputs.cuda()
-#             labels = labels.cuda()
-
-#             scores, _ = models['backbone'](inputs)
-#             _, preds = torch.max(scores.data, 1)
-#             total += labels.size(0)
-#             correct += (preds == labels).sum().item()
-    
-#     return 100 * correct / total
 
 def train(models,
           criterion,
@@ -290,16 +280,8 @@ if __name__ == '__main__':
         random.shuffle(train_set)
         
         labeled_set = train_set[:ADDENDUM]
-        unlabeled_set = train_set[ADDENDUM:]
+        unlabeled_set = train_set[ADDENDUM:]  
         
-        # data load and transform
-        # https://pytorch.org/docs/stable/data.html
-        
-        
-        
-        
-        # directory you download 'D:\\'
-        # train이 모두 True인 이유는 라벨이 있는 전체 풀에서 뽑기 때문
         train_params = {"batch_size": BATCH,
                         "shuffle": False, # sampler랑 같이 쓸 수 없음
                         "drop_last": False,
@@ -320,7 +302,6 @@ if __name__ == '__main__':
         
         # backbone
         model = SSD(backbone=ResNet(), num_classes=len(kitti_classes)).cuda()
-        
         # Loss model
         loss_module = lossnet.LossNet().cuda() # lossnet을 위한 feature 빼오는 부분
         
@@ -329,10 +310,7 @@ if __name__ == '__main__':
         torch.backends.cudnn.benchmark = False
         
         # Active learning cycles 
-        # config에서 10번으로 잡음
         for cycle in range(CYCLES):
-            
-#             LR=2.6e-3
             LR = LR * (BATCH / 32)
             criterion = Loss(dboxes).cuda()
 
@@ -363,7 +341,6 @@ if __name__ == '__main__':
             schedulers = {'backbone': sched_backbone, 'module': sched_module}
                 
             ##----------------------TRAIN----------------------------
-            # Training and test
             train(models,
                   criterion,
                   optimizers,
@@ -375,22 +352,17 @@ if __name__ == '__main__':
 #                   plot_data)
             
             nms_threshold = 0.5
-            acc = test(models, dataloaders, encoder, nms_threshold, mode='test')
-            acc = "not yet"
-    
-    
-            print('Trial {}/{} || Cycle {}/{} || Label set size {}: Test acc {}'.format(trial+1,
+            detect_num = test(models, dataloaders, encoder, nms_threshold, mode='test')
+
+            print('Trial {}/{} || Cycle {}/{} || Label set size {}: Test detect_num {}'.format(trial+1,
                                                                                         TRIALS,
                                                                                         cycle+1,
                                                                                         CYCLES,
                                                                                         len(labeled_set),
-                                                                                        acc))
+                                                                                        detect_num))
 
-            
-
-            #  Update the labeled dataset via loss prediction-based uncertainty measurement
-            # 모델에 추가적으로 라벨을 넣어줄 부분
-            # Randomly sample 10000 unlabeled data points
+            # Update the labeled dataset via loss prediction-based uncertainty measurement
+            # Randomly sample 300 unlabeled data points
             random.shuffle(unlabeled_set)
             subset = unlabeled_set[:SUBSET]
 
@@ -404,7 +376,6 @@ if __name__ == '__main__':
             unlabeled_loader = DataLoader(kitti_unlabeled, **unlabeled_params)
 
             # Measure uncertainty of each data points in the subset
-            # 이 부분이 data selection이 일어나는 부분
             uncertainty = get_uncertainty(models, unlabeled_loader)
 
             # Index in ascending order
@@ -428,8 +399,7 @@ if __name__ == '__main__':
             print('>> LABELED:', len(labeled_set))
             print('>> UNLABELED', len(unlabeled_set))
         # Save a checkpoint
-#         torch.save({
-#                     'trial': trial + 1,
-#                     'state_dict_backbone': models['backbone'].state_dict(),
-#                     'state_dict_module': models['module'].state_dict()},
-#             './kitti/train/weights/active_resnet50_kitti_trial{}.pth'.format(trial))
+        torch.save({'trial': trial + 1,
+                    'state_dict_backbone': models['backbone'].state_dict(),
+                    'state_dict_module': models['module'].state_dict()},
+            './ckpt/train/weights/active_resnet50_kitti_trial{}.pth'.format(trial))
