@@ -21,7 +21,7 @@ If you can run `main.py`, the setting is done.
     - (maybe later) https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
     
     ![](./img/code_structure.png)
-        
+    ![](./img/main_flow.png)
     ![plan](./img/plan.png)
 
 2. 
@@ -74,6 +74,7 @@ If you can run `main.py`, the setting is done.
 ### SSD
 - [nvidia_deeplearningexamples_ssd](https://pytorch.org/hub/nvidia_deeplearningexamples_ssd/) : ssd모델 그냥 불러오는 것 같은데 어떻게 수정할 수 있는지 모르겠음
 - [a-PyTorch-Tutorial-to-Object-Detection](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection)
+- [mAP 계산하기](https://herbwood.tistory.com/3)
 
 ### ETC
 - [argparse](https://m.blog.naver.com/cjh226/220997049388)
