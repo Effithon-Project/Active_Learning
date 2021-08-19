@@ -1,4 +1,7 @@
 **jungyeon working directory**
+
+> BEFORE running the code, you have to download Kitti dataset! And then, change the dataset directory in `main.py`.
+
 ## Setting Virtual Environment with Anaconda
 
 `conda create -n [VIR_ENV_NAME] python==3.8`
