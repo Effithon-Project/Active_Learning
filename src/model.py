@@ -16,22 +16,18 @@ class Base(nn.Module):
     def bbox_view(self, src, loc, conf):
         ret = []
         for s, l, c in zip(src, loc, conf):
+#             print((l(s).view(s.size(0), 4, -1)))
             ret.append((l(s).view(s.size(0), 4, -1),
                         c(s).view(s.size(0),self.num_classes, -1)))
 
         locs, confs = list(zip(*ret))
         locs, confs = torch.cat(locs, 2).contiguous(), torch.cat(confs, 2).contiguous()
+        locs = torch.clamp(locs, min=0, max=1) ##--------------------------------------------
+        confs = torch.clamp(confs, min=0)
+#         print(locs)
+#         print ((locs <= 0 ).nonzero(as_tuple=True)[0])
+
         return locs, confs
-    
-    def loss_net(self, src, loss):
-        ret = []
-        for s, l in zip(src, loss):
-            ret.append((l(s).view(s.size(0), 1, -1)))
-
-        losses = list(ret)
-        losses = torch.cat(losses, 2).contiguous()
-        return losses
-
 
 class ResNet(nn.Module):
     def __init__(self):
@@ -51,7 +47,7 @@ class ResNet(nn.Module):
 
 
 class SSD(Base):
-    def __init__(self, backbone=ResNet(), num_classes=81):
+    def __init__(self, backbone=ResNet(), num_classes=9):
         super().__init__()
 
         self.feature_extractor = backbone

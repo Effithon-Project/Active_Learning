@@ -34,6 +34,8 @@ from src.model import SSD, ResNet
 from src.utils import generate_dboxes, Encoder, kitti_classes
 from src.loss import Loss
 from src.dataset import collate_fn, KittiDataset
+# map
+from src.metric import *
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -111,7 +113,7 @@ def train_epoch(models,
         ploc, plabel, out_dict = models['backbone'](img)
         ploc, plabel = ploc.float(), plabel.float()
         gloc = gloc.transpose(1, 2).contiguous()
-        target_loss = criterion(ploc, plabel, gloc, glabel)
+        target_loss = criterion(ploc, plabel, gloc, glabel) # confidence 기반
         
         features = out_dict
         pred_loss = models['module'](features) 
@@ -148,15 +150,15 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
         img = img.cuda()
         gloc = gloc.cuda() # gt localization
         glabel = glabel.cuda() # gt label
-        test = img_id[2]
-        print(test)
+
         with torch.no_grad():
             # Get predictions
             ploc, plabel, out_dict = models['backbone'](img)
             ploc, plabel = ploc.float(), plabel.float()
+#             print(ploc)
             gloc = gloc.transpose(1, 2).contiguous()
             
-            # batch 묶음에서 하나 가져오기 idx:0,1,2,3,4,...
+            # batch 묶음에서 이미지 하나 가져오기 idx:0,1,2,3,4,...
             for idx in range(ploc.shape[0]):
                 ploc_i = ploc[idx, :, :].unsqueeze(0)
                 plabel_i = plabel[idx, :, :].unsqueeze(0)
@@ -165,28 +167,29 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
                                                   plabel_i,
                                                   nms_threshold,
                                                   200)[0]
-                    
+#                     print(result[0].size()) # torch.Size([200, 4]) bbox
                 except:
                     print("No object detected in idx: {}".format(idx))
 
                 height, width = img_size[idx]
-                loc, label, prob = [r.cpu().numpy() for r in result]
+                loc, label, prob = [r.cpu().numpy() for r in result] # numpy
+                for loc_, label_, prob_ in zip(loc, label, prob):
+                    # xyxy
+                    print(loc_[0] * width,
+                          loc_[1] * height,
+                          loc_[2] * width,
+                          loc_[3] * height)
                 
-#                 for loc_, label_, prob_ in zip(loc, label, prob):
-                    
-#                     detections.append([img_id[idx],
-#                                        loc_[0] * width,
-#                                        loc_[1] * height,
-#                                        (loc_[2] - loc_[0]) * width,
-#                                        (loc_[3] - loc_[1]) * height,
-#                                        prob_,
-#                                        category_ids[label_ - 1]])
-                    
-#                     if img_id[idx] == test:
-#                         print("detections", detections)
+                    detections.append([img_id[idx],
+                                       loc_[0] * width,
+                                       loc_[1] * height,
+                                       loc_[2] * width,
+                                       loc_[3] * height,
+                                       prob_,
+                                       category_ids[label_ - 1]])
 
-#     print()
-#     print(len(detections))
+    print()
+    print(len(detections))
 #     detections = np.array(detections, dtype=np.float32)
 #     return len(detections)
     
@@ -254,8 +257,8 @@ def get_uncertainty(models, unlabeled_loader):
     with torch.no_grad():
         for i, (img, _, _, gloc, glabel) in enumerate(unlabeled_loader):
             img = img.cuda()
-            gloc = gloc.cuda() # gt localization
-            glabel = glabel.cuda() # gt label
+#             gloc = gloc.cuda() # gt localization
+#             glabel = glabel.cuda() # gt label
             
             ploc, plabel, out_dict = models['backbone'](img)
 
@@ -307,7 +310,7 @@ if __name__ == '__main__':
         # backbone
         model = SSD(backbone=ResNet(), num_classes=len(kitti_classes)).cuda()
         # Loss model
-        loss_module = lossnet.LossNet().cuda() # lossnet을 위한 feature 빼오는 부분
+        loss_module = lossnet.LossNet().cuda() 
         
         models      = {'backbone': model, 'module': loss_module}
         
@@ -356,7 +359,7 @@ if __name__ == '__main__':
 #                   plot_data)
             
             nms_threshold = 0.5
-            detect_num = test(models, dataloaders, encoder, nms_threshold, mode='test')
+            mAP = test(models, dataloaders, encoder, nms_threshold, mode='test')
 
             print('Trial {}/{} || Cycle {}/{} || Label set size {}: Test detect_num {}'.format(trial+1,
                                                                                         TRIALS,
