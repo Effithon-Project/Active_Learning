@@ -11,21 +11,21 @@ kitti_classes = ['Car','DontCare','Person_sitting','Truck','Cyclist','Pedestrian
 
 def generate_dboxes(model="ssd"):
         
-    figsize = (300, 1000)
+    figsize = (384, 1280)
 
-    feat_size = [(31, 97), (15, 51), (9, 21), (6, 15), (5, 12), (1, 6)]
+    feat_size =  [(48, 160), (24, 80), (12, 40), (6, 20), (4, 18), (2, 16)]
 
     steps = [8, 16, 32, 64, 100, 300]
 
-    scales = [(15.,21.),(21., 45.),(45., 99.),(99., 153.), (153., 207.),(207., 261.),(261., 315.)] ##...??
+    scales = [(21., 45.),(45., 99.),(99., 153.),(153., 207.),(207., 261.),(261., 315.), (315,345)]
 
     aspect_ratios = [[2, .5],
-                     [2, .5, 3, 1./3],
-                     [2, .5, 3, 1./3],
-                     [2, .5, 3, 1./3],
-                     [2, .5],
-                     [2, .5]]
-    
+                    [2, .5, 3, 1./3],
+                    [2, .5, 3, 1./3],
+                    [2, .5, 3, 1./3],
+                    [2, .5],
+                    [2, .5]]
+
     #  DefaultBoxes------------------------------------------------------->
     dboxes = DefaultBoxes(figsize, feat_size, steps, scales, aspect_ratios)
 
@@ -53,6 +53,7 @@ class DefaultBoxes(object):
 
             sk1_h = scales[idx][0] / fig_size[0] # 300
             sk1_w = scales[idx][1] / fig_size[1] # 1000
+#             print(idx)
             sk2_h = scales[idx + 1][0] / fig_size[0]
             sk2_w = scales[idx + 1][1] / fig_size[1]
 

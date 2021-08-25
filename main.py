@@ -51,10 +51,10 @@ dboxes = generate_dboxes(model="ssd")
 encoder = Encoder(dboxes)
 # directory you download 'D:\\'
 kitti_tot = KittiDataset("D:\\", train=True,
-                         transform=SSDTransformer(dboxes, (300, 1000),val=False))
+                         transform=SSDTransformer(dboxes, (384, 1280),val=False))
         
 kitti_unlabeled = KittiDataset("D:\\", train=True,
-                               transform=SSDTransformer(dboxes, (300, 1000),val=False))
+                               transform=SSDTransformer(dboxes, (384, 1280),val=False))
 
 def LossPredLoss(input, target, margin=1.0, reduction='mean'):
     """
@@ -111,15 +111,25 @@ def train_epoch(models,
 
         # locs, confs // predicted localization, predicted label
         ploc, plabel, out_dict = models['backbone'](img)
+#         print(out_dict[0].size())
+#         print(out_dict[1].size())
+#         print(out_dict[2].size())
+#         print(out_dict[3].size())
+#         print(out_dict[4].size())
+# #         print(out_dict[5].size())
         ploc, plabel = ploc.float(), plabel.float()
+#         print(gloc.size())
         gloc = gloc.transpose(1, 2).contiguous()
+#         print(gloc.size())
         
         print("="*100)
         print("ploc: ",ploc.size())
         print("gloc: ",gloc.size())
-        print("="*100)
-        print("plabel: ",plabel.size())
-        print("glabel: ",glabel.size())
+#         print(gloc)
+#         print("="*100)
+#         print("plabel: ",plabel.size())
+#         print("glabel: ",glabel.size())
+#         print(glabel)
         
         target_loss = criterion(ploc, plabel, gloc, glabel) # confidence 기반
         

@@ -46,6 +46,7 @@ class LossNet(nn.Module):
         print(features[2].size())
         print(features[3].size())
         print(features[4].size())
+        
         out1 = self.GAP1(features[0]) # 32
         out1 = out1.view(out1.size(0), -1)
         out1 = F.relu(self.FC1(out1))

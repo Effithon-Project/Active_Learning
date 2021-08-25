@@ -54,6 +54,7 @@ class SSD(Base):
 
         self.feature_extractor = backbone
         self.num_classes = num_classes
+
         self._build_additional_features(self.feature_extractor.out_channels)
         self.num_defaults = [4, 6, 6, 6, 4, 4]
         self.loc = []
@@ -68,6 +69,7 @@ class SSD(Base):
 
     def _build_additional_features(self, input_size):
         self.additional_blocks = []
+        
         for i, (input_size, output_size, channels) in enumerate(
                 zip(input_size[:-1], input_size[1:], [256, 256, 128, 128, 128])): ##
             if i < 3:
@@ -113,12 +115,12 @@ class SSD(Base):
             x = l(x)
             detection_feed.append(x)
         
-#         print(detection_feed[0].size())
-#         print(detection_feed[1].size())
-#         print(detection_feed[2].size())
-#         print(detection_feed[3].size())
-#         print(detection_feed[4].size())
-#         print(detection_feed[5].size())
+        print(detection_feed[0].size())
+        print(detection_feed[1].size())
+        print(detection_feed[2].size())
+        print(detection_feed[3].size())
+        print(detection_feed[4].size())
+        print(detection_feed[5].size())
         locs, confs = self.bbox_view(detection_feed, self.loc, self.conf)
 #         print(locs.size())
         return locs, confs, out_dict
