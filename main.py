@@ -113,8 +113,13 @@ def train_epoch(models,
         ploc, plabel, out_dict = models['backbone'](img)
         ploc, plabel = ploc.float(), plabel.float()
         gloc = gloc.transpose(1, 2).contiguous()
-        print(ploc.size())
-        print(gloc.size())
+        
+        print("="*100)
+        print("ploc: ",ploc.size())
+        print("gloc: ",gloc.size())
+        print("="*100)
+        print("plabel: ",plabel.size())
+        print("glabel: ",glabel.size())
         
         target_loss = criterion(ploc, plabel, gloc, glabel) # confidence 기반
         

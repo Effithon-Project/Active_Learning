@@ -13,7 +13,7 @@ def generate_dboxes(model="ssd"):
         
     figsize = (300, 1000)
 
-    feat_size = [(34, 113), (17, 57), (9, 29), (5, 15), (3, 13), (1, 11)]
+    feat_size = [(31, 97), (15, 51), (9, 21), (6, 15), (5, 12), (1, 6)]
 
     steps = [8, 16, 32, 64, 100, 300]
 
@@ -51,8 +51,8 @@ class DefaultBoxes(object):
         
         for idx, sfeat in enumerate(self.feat_size):
 
-            sk1_h = scales[idx][0] / fig_size[0] # 270
-            sk1_w = scales[idx][1] / fig_size[1] # 900
+            sk1_h = scales[idx][0] / fig_size[0] # 300
+            sk1_w = scales[idx][1] / fig_size[1] # 1000
             sk2_h = scales[idx + 1][0] / fig_size[0]
             sk2_w = scales[idx + 1][1] / fig_size[1]
 

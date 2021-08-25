@@ -16,8 +16,9 @@ class Base(nn.Module):
     def bbox_view(self, src, loc, conf):
         ret = []
         for s, l, c in zip(src, loc, conf):
-            print("here")
-            print((l(s).view(s.size(0), 4, -1)).size())
+            print("-"*100)
+            print("ploc from one feature map: ",(l(s).view(s.size(0), 4, -1)).size())
+            print("plabel from one feature map: ",(c(s).view(s.size(0),self.num_classes, -1)).size())
             ret.append((l(s).view(s.size(0), 4, -1),
                         c(s).view(s.size(0),self.num_classes, -1)))
 
