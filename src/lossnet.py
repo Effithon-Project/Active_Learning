@@ -14,7 +14,7 @@ class LossNet(nn.Module):
     num_channels <- model.py out_channels
     """
     def __init__(self, feature_sizes=[32, 16, 8, 4, 2],
-                 num_channels=[1024, 512, 512, 256, 256, 256], interm_dim=128):
+                 num_channels=[1024, 512, 512, 256, 256], interm_dim=256):
         
         super(LossNet, self).__init__()
         
@@ -41,11 +41,11 @@ class LossNet(nn.Module):
         torch.Size([4, 256, 5, 5])
         torch.Size([4, 256, 3, 3])
         """
-#         print(features[0].size())
-#         print(features[1].size())
-#         print(features[2].size())
-#         print(features[3].size())
-#         print(features[4].size())
+        print(features[0].size())
+        print(features[1].size())
+        print(features[2].size())
+        print(features[3].size())
+        print(features[4].size())
         out1 = self.GAP1(features[0]) # 32
         out1 = out1.view(out1.size(0), -1)
         out1 = F.relu(self.FC1(out1))

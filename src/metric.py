@@ -1,171 +1,149 @@
 """
+https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection/blob/master/utils.py
 https://herbwood.tistory.com/3
 https://github.com/herbwood/mAP/blob/main/mAP.ipynb
 """
-def getArea(box):
-    return (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
-
-
-def getUnionAreas(boxA, boxB, interArea=None):
-    area_A = getArea(boxA)
-    area_B = getArea(boxB)
+def calculate_mAP(det_boxes,
+                  det_labels,
+                  det_scores,
+                  true_boxes,
+                  true_labels,
+                  true_difficulties=None):
+    """
+    Calculate the Mean Average Precision (mAP) of detected objects.
+    See https://medium.com/@jonathan_hui/map-mean-average-precision-for-object-detection-45c121a31173 for an explanation
+    :param det_boxes: list of tensors, one tensor for each image
+                    containing detected objects' bounding boxes -> loc
+    :param det_labels: list of tensors, one tensor for each image 
+                    containing detected objects' labels
+    :param det_scores: list of tensors, one tensor for each image 
+                    containing detected objects' labels' scores
+    :param true_boxes: list of tensors, one tensor for each image
+                    containing actual objects' bounding boxes
+    :param true_labels: list of tensors, one tensor for each image 
+                    containing actual objects' labels
+    :param true_difficulties: list of tensors, one tensor for each image 
+                    containing actual objects' difficulty (0 or 1)
+                    
+                    
+    :return: list of average precisions for all classes, mean average precision (mAP)
     
-    if interArea is None:
-        interArea = getIntersectionArea(boxA, boxB)
-        
-    return float(area_A + area_B - interArea)
-
-def getIntersectionArea(boxA, boxB):
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
-    # intersection area
-    return (xB - xA + 1) * (yB - yA + 1)
-
-def boxesIntersect(boxA, boxB):
-    if boxA[0] > boxB[2]:
-        return False  # boxA is right of boxB
-    if boxB[0] > boxA[2]:
-        return False  # boxA is left of boxB
-    if boxA[3] < boxB[1]:
-        return False  # boxA is above boxB
-    if boxA[1] > boxB[3]:
-        return False  # boxA is below boxB
-    return True
-
-def iou(boxA, boxB):
-    # if boxes dont intersect
-    if boxesIntersect(boxA, boxB) is False:
-        return 0
-    interArea = getIntersectionArea(boxA, boxB)
-    union = getUnionAreas(boxA, boxB, interArea=interArea)
     
-    # intersection over union
-    result = interArea / union
-    assert result >= 0
-    return resultv
+    """
+    assert len(det_boxes) == len(det_labels) == len(det_scores) == len(true_boxes) == len(
+        true_labels) #== len(true_difficulties)  # these are all lists of tensors of the same length, i.e. number of images
+    n_classes = len(label_map)
 
-def calculateAveragePrecision(rec, prec):
-    
-    mrec = [0] + [e for e in rec] + [1]
-    mpre = [0] + [e for e in prec] + [0]
+    # Store all (true) objects in a single continuous tensor while keeping track of the image it is from
+    true_images = list()
+    for i in range(len(true_labels)):
+        true_images.extend([i] * true_labels[i].size(0))
+    true_images = torch.LongTensor(true_images).to(
+        device)  # (n_objects), n_objects is the total no. of objects across all images
+    true_boxes = torch.cat(true_boxes, dim=0)  # (n_objects, 4)
+    true_labels = torch.cat(true_labels, dim=0)  # (n_objects)
+#     true_difficulties = torch.cat(true_difficulties, dim=0)  # (n_objects)
 
-    for i in range(len(mpre)-1, 0, -1):
-        mpre[i-1] = max(mpre[i-1], mpre[i])
+    assert true_images.size(0) == true_boxes.size(0) == true_labels.size(0)
 
-    ii = []
+    # Store all detections in a single continuous tensor while keeping track of the image it is from
+    det_images = list()
+    for i in range(len(det_labels)):
+        det_images.extend([i] * det_labels[i].size(0))
+    det_images = torch.LongTensor(det_images).to(device)  # (n_detections)
+    det_boxes = torch.cat(det_boxes, dim=0)  # (n_detections, 4)
+    det_labels = torch.cat(det_labels, dim=0)  # (n_detections)
+    det_scores = torch.cat(det_scores, dim=0)  # (n_detections)
 
-    for i in range(len(mrec)-1):
-        if mrec[1:][i] != mrec[0:-1][i]:
-            ii.append(i+1)
+    assert det_images.size(0) == det_boxes.size(0) == det_labels.size(0) == det_scores.size(0)
 
-    ap = 0
-    for i in ii:
-        ap = ap + np.sum((mrec[i] - mrec[i-1]) * mpre[i])
-    
-    return [ap, mpre[0:len(mpre)-1], mrec[0:len(mpre)-1], ii]
+    # Calculate APs for each class (except background)
+    average_precisions = torch.zeros((n_classes - 1), dtype=torch.float)  # (n_classes - 1)
+    for c in range(1, n_classes):
+        # Extract only objects with this class
+        true_class_images = true_images[true_labels == c]  # (n_class_objects)
+        true_class_boxes = true_boxes[true_labels == c]  # (n_class_objects, 4)
+#         true_class_difficulties = true_difficulties[true_labels == c]  # (n_class_objects)
+#         n_easy_class_objects = (1 - true_class_difficulties).sum().item()  # ignore difficult objects
 
-def ElevenPointInterpolatedAP(rec, prec):
+        # Keep track of which true objects with this class have already been 'detected'
+        # So far, none
+#         true_class_boxes_detected = torch.zeros((true_class_difficulties.size(0)), dtype=torch.uint8).to(device)  # (n_class_objects)
 
-    mrec = [e for e in rec]
-    mpre = [e for e in prec]
+        # Extract only detections with this class
+        det_class_images = det_images[det_labels == c]  # (n_class_detections)
+        det_class_boxes = det_boxes[det_labels == c]  # (n_class_detections, 4)
+        det_class_scores = det_scores[det_labels == c]  # (n_class_detections)
+        n_class_detections = det_class_boxes.size(0)
+        if n_class_detections == 0:
+            continue
 
-    recallValues = np.linspace(0, 1, 11)
-    recallValues = list(recallValues[::-1])
-    rhoInterp, recallValid = [], []
+        # Sort detections in decreasing order of confidence/scores
+        det_class_scores, sort_ind = torch.sort(det_class_scores, dim=0, descending=True)  # (n_class_detections)
+        det_class_images = det_class_images[sort_ind]  # (n_class_detections)
+        det_class_boxes = det_class_boxes[sort_ind]  # (n_class_detections, 4)
 
-    for r in recallValues:
-        argGreaterRecalls = np.argwhere(mrec[:] >= r)
-        pmax = 0
+        # In the order of decreasing scores, check if true or false positive
+        true_positives = torch.zeros((n_class_detections), dtype=torch.float).to(device)  # (n_class_detections)
+        false_positives = torch.zeros((n_class_detections), dtype=torch.float).to(device)  # (n_class_detections)
+        for d in range(n_class_detections):
+            this_detection_box = det_class_boxes[d].unsqueeze(0)  # (1, 4)
+            this_image = det_class_images[d]  # (), scalar
 
-        if argGreaterRecalls.size != 0:
-            pmax = max(mpre[argGreaterRecalls.min():])
+            # Find objects in the same image with this class, their difficulties, and whether they have been detected before
+            object_boxes = true_class_boxes[true_class_images == this_image]  # (n_class_objects_in_img)
+#             object_difficulties = true_class_difficulties[true_class_images == this_image]  # (n_class_objects_in_img)
+            # If no such object in this image, then the detection is a false positive
+            if object_boxes.size(0) == 0:
+                false_positives[d] = 1
+                continue
 
-        recallValid.append(r)
-        rhoInterp.append(pmax)
+            # Find maximum overlap of this detection with objects in this image of this class
+            overlaps = find_jaccard_overlap(this_detection_box, object_boxes)  # (1, n_class_objects_in_img)
+            max_overlap, ind = torch.max(overlaps.squeeze(0), dim=0)  # (), () - scalars
 
-    ap = sum(rhoInterp) / 11
+            # 'ind' is the index of the object in these image-level tensors 'object_boxes', 'object_difficulties'
+            # In the original class-level tensors 'true_class_boxes', etc., 'ind' corresponds to object with index...
+            original_ind = torch.LongTensor(range(true_class_boxes.size(0)))[true_class_images == this_image][ind]
+            # We need 'original_ind' to update 'true_class_boxes_detected'
 
-    return [ap, rhoInterp, recallValues, None]
-
-def AP(detections, groundtruths, classes, IOUThreshold = 0.3, method = 'AP'):
-    
-    result = []
-    
-    for c in classes:
-
-        dects = [d for d in detections if d[1] == c]
-        gts = [g for g in groundtruths if g[1] == c]
-
-        npos = len(gts)
-
-        dects = sorted(dects, key = lambda conf : conf[2], reverse=True)
-
-        TP = np.zeros(len(dects))
-        FP = np.zeros(len(dects))
-
-        det = Counter(cc[0] for cc in gts)
-
-        # 각 이미지별 ground truth box의 수
-        # {99 : 2, 380 : 4, ....}
-        # {99 : [0, 0], 380 : [0, 0, 0, 0], ...}
-        for key, val in det.items():
-            det[key] = np.zeros(val)
-
-
-        for d in range(len(dects)):
-
-
-            gt = [gt for gt in gts if gt[0] == dects[d][0]]
-
-            iouMax = 0
-
-            for j in range(len(gt)):
-                iou1 = iou(dects[d][3], gt[j][3])
-                if iou1 > iouMax:
-                    iouMax = iou1
-                    jmax = j
-
-            if iouMax >= IOUThreshold:
-                if det[dects[d][0]][jmax] == 0:
-                    TP[d] = 1
-                    det[dects[d][0]][jmax] = 1
+            # If the maximum overlap is greater than the threshold of 0.5, it's a match
+            if max_overlap.item() > 0.5:
+                # If the object it matched with is 'difficult', ignore it
+#                 if object_difficulties[ind] == 0:
+                    # If this object has already not been detected, it's a true positive
+                if true_class_boxes_detected[original_ind] == 0:
+                    true_positives[d] = 1
+                    true_class_boxes_detected[original_ind] = 1  # this object has now been detected/accounted for
+                # Otherwise, it's a false positive (since this object is already accounted for)
                 else:
-                    FP[d] = 1
+                    false_positives[d] = 1
+            # Otherwise, the detection occurs in a different location than the actual object, and is a false positive
             else:
-                FP[d] = 1
+                false_positives[d] = 1
 
-        acc_FP = np.cumsum(FP)
-        acc_TP = np.cumsum(TP)
-        rec = acc_TP / npos
-        prec = np.divide(acc_TP, (acc_FP + acc_TP))
+        # Compute cumulative precision and recall at each detection in the order of decreasing scores
+        cumul_true_positives = torch.cumsum(true_positives, dim=0)  # (n_class_detections)
+        cumul_false_positives = torch.cumsum(false_positives, dim=0)  # (n_class_detections)
+        cumul_precision = cumul_true_positives / (
+                cumul_true_positives + cumul_false_positives + 1e-10)  # (n_class_detections)
+        cumul_recall = cumul_true_positives / n_easy_class_objects  # (n_class_detections)
 
-        if method == "AP":
-            [ap, mpre, mrec, ii] = calculateAveragePrecision(rec, prec)
-        else:
-            [ap, mpre, mrec, _] = ElevenPointInterpolatedAP(rec, prec)
+        # Find the mean of the maximum of the precisions corresponding to recalls above the threshold 't'
+        recall_thresholds = torch.arange(start=0, end=1.1, step=.1).tolist()  # (11)
+        precisions = torch.zeros((len(recall_thresholds)), dtype=torch.float).to(device)  # (11)
+        for i, t in enumerate(recall_thresholds):
+            recalls_above_t = cumul_recall >= t
+            if recalls_above_t.any():
+                precisions[i] = cumul_precision[recalls_above_t].max()
+            else:
+                precisions[i] = 0.
+        average_precisions[c - 1] = precisions.mean()  # c is in [1, n_classes - 1]
 
-        r = {
-            'class' : c,
-            'precision' : prec,
-            'recall' : rec,
-            'AP' : ap,
-            'interpolated precision' : mpre,
-            'interpolated recall' : mrec,
-            'total positives' : npos,
-            'total TP' : np.sum(TP),
-            'total FP' : np.sum(FP)
-        }
+    # Calculate Mean Average Precision (mAP)
+    mean_average_precision = average_precisions.mean().item()
 
-        result.append(r)
+    # Keep class-wise average precisions in a dictionary
+    average_precisions = {rev_label_map[c + 1]: v for c, v in enumerate(average_precisions.tolist())}
 
-    return result
-
-def mAP(result):
-    ap = 0
-    for r in result:
-        ap += r['AP']
-    mAP = ap / len(result)
-    
-    return mAP
+    return average_precisions, mean_average_precision

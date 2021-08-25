@@ -11,15 +11,20 @@ kitti_classes = ['Car','DontCare','Person_sitting','Truck','Cyclist','Pedestrian
 
 def generate_dboxes(model="ssd"):
         
-    figsize = 300
+    figsize = (300, 1000)
 
-    feat_size = [38, 19, 10, 5, 3, 1]
+    feat_size = [(34, 113), (17, 57), (9, 29), (5, 15), (3, 13), (1, 11)]
 
     steps = [8, 16, 32, 64, 100, 300]
 
-    scales = [21, 45, 99, 153, 207, 261, 315]
+    scales = [(15.,21.),(21., 45.),(45., 99.),(99., 153.), (153., 207.),(207., 261.),(261., 315.)] ##...??
 
-    aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
+    aspect_ratios = [[2, .5],
+                     [2, .5, 3, 1./3],
+                     [2, .5, 3, 1./3],
+                     [2, .5, 3, 1./3],
+                     [2, .5],
+                     [2, .5]]
     
     #  DefaultBoxes------------------------------------------------------->
     dboxes = DefaultBoxes(figsize, feat_size, steps, scales, aspect_ratios)
@@ -30,36 +35,46 @@ class DefaultBoxes(object):
     
     def __init__(self, fig_size, feat_size, steps, scales, aspect_ratios, scale_xy=0.1, scale_wh=0.2):
         
-        self.fig_size = fig_size                  # 300
-        self.feat_size = feat_size                # [38, 19, 10, 5, 3, 1]
-        self.steps = steps                        # [8, 16, 32, 64, 100, 300]
-        self.scales = scales                      # [21, 45, 99, 153, 207, 261, 315]
-        self.aspect_ratios = aspect_ratios        # [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
-        self.scale_xy = scale_xy                  # 0.1
-        self.scale_wh = scale_wh                  # 0.2
+        self.fig_size = fig_size                  
+        self.feat_size = feat_size                
+        self.steps = steps                        
+        self.scales = scales                      
+        self.aspect_ratios = aspect_ratios        
+        self.scale_xy = scale_xy                  
+        self.scale_wh = scale_wh                  
         
-        fk = fig_size / np.array(steps)
+        fk_w = fig_size[1] / np.array(steps)
+        fk_h = fig_size[0] / np.array(steps)
+
         
         self.default_boxes = []
         
         for idx, sfeat in enumerate(self.feat_size):
 
-            sk1 = scales[idx] / fig_size
-            sk2 = scales[idx + 1] / fig_size
-            sk3 = sqrt(sk1 * sk2)
-            all_sizes = [(sk1, sk1), (sk3, sk3)]
+            sk1_h = scales[idx][0] / fig_size[0] # 270
+            sk1_w = scales[idx][1] / fig_size[1] # 900
+            sk2_h = scales[idx + 1][0] / fig_size[0]
+            sk2_w = scales[idx + 1][1] / fig_size[1]
+
+            sk3_h = sqrt(sk1_h * sk2_h)
+            sk3_w = sqrt(sk1_w * sk2_w)
+            
+            all_sizes = [(sk1_w, sk1_h), (sk3_w, sk3_h)]
 
             for alpha in aspect_ratios[idx]:
-                w, h = sk1 * sqrt(alpha), sk1 / sqrt(alpha)
+                w, h = sk1_w * sqrt(alpha), sk1_h / sqrt(alpha)
                 all_sizes.append((w, h))
                 all_sizes.append((h, w))
+                
             for w, h in all_sizes:
-                for i, j in itertools.product(range(sfeat), repeat=2):
-                    cx, cy = (j + 0.5) / fk[idx], (i + 0.5) / fk[idx]
+                for i, j in itertools.product(range(sfeat[0]), range(sfeat[1])):
+
+                    cx, cy = (j + 0.5) / fk_w[idx], (i + 0.5) / fk_h[idx]
                     self.default_boxes.append((cx, cy, w, h))
 
         self.dboxes = torch.tensor(self.default_boxes, dtype=torch.float)
         self.dboxes.clamp_(min=0, max=1)
+        
         self.dboxes_ltrb = box_convert(self.dboxes, in_fmt="cxcywh", out_fmt="xyxy")
 
     def __call__(self, order="ltrb"):
@@ -76,6 +91,7 @@ class Encoder(object):
         
         self.dboxes = dboxes(order="ltrb") # left top right bottom
         self.dboxes_xywh = dboxes(order="xywh").unsqueeze(dim=0)
+#         print(self.dboxes_xywh.size())
         self.nboxes = self.dboxes.size(0)
         self.scale_xy = dboxes.scale_xy
         self.scale_wh = dboxes.scale_wh

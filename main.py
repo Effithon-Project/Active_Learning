@@ -51,10 +51,10 @@ dboxes = generate_dboxes(model="ssd")
 encoder = Encoder(dboxes)
 # directory you download 'D:\\'
 kitti_tot = KittiDataset("D:\\", train=True,
-                         transform=SSDTransformer(dboxes, (300, 300),val=False))
+                         transform=SSDTransformer(dboxes, (300, 1000),val=False))
         
 kitti_unlabeled = KittiDataset("D:\\", train=True,
-                               transform=SSDTransformer(dboxes, (300, 300),val=False))
+                               transform=SSDTransformer(dboxes, (300, 1000),val=False))
 
 def LossPredLoss(input, target, margin=1.0, reduction='mean'):
     """
@@ -113,6 +113,9 @@ def train_epoch(models,
         ploc, plabel, out_dict = models['backbone'](img)
         ploc, plabel = ploc.float(), plabel.float()
         gloc = gloc.transpose(1, 2).contiguous()
+        print(ploc.size())
+        print(gloc.size())
+        
         target_loss = criterion(ploc, plabel, gloc, glabel) # confidence 기반
         
         features = out_dict
@@ -134,7 +137,7 @@ def train_epoch(models,
 
 def test(models, dataloaders, encoder, nms_threshold, mode='val'):
     """
-    evaluate(model, test_loader, encoder, nms_threshold)
+    mAP 
     """
     assert mode == 'val' or mode == 'test'
     models['backbone'].eval()
@@ -155,41 +158,57 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
             # Get predictions
             ploc, plabel, out_dict = models['backbone'](img)
             ploc, plabel = ploc.float(), plabel.float()
-#             print(ploc)
             gloc = gloc.transpose(1, 2).contiguous()
             
             # batch 묶음에서 이미지 하나 가져오기 idx:0,1,2,3,4,...
-            for idx in range(ploc.shape[0]):
-                ploc_i = ploc[idx, :, :].unsqueeze(0)
-                plabel_i = plabel[idx, :, :].unsqueeze(0)
-                try:
-                    result = encoder.decode_batch(ploc_i,
-                                                  plabel_i,
-                                                  nms_threshold,
-                                                  200)[0]
-#                     print(result[0].size()) # torch.Size([200, 4]) bbox
-                except:
-                    print("No object detected in idx: {}".format(idx))
+#             for idx in range(ploc.shape[0]):
+#                 ploc_i = ploc[idx, :, :].unsqueeze(0)
+#                 plabel_i = plabel[idx, :, :].unsqueeze(0)
+#                 try:
+#                     result = encoder.decode_batch(ploc_i,
+#                                                   plabel_i,
+#                                                   nms_threshold,
+#                                                   200)[0]
+# #                     print(result[0].size()) # torch.Size([200, 4]) bbox
+# #                 bboxes_out[max_ids, :], labels_out[max_ids], scores_out[max_ids]
+#                 except:
+#                     print("No object detected in idx: {}".format(idx))
 
-                height, width = img_size[idx]
-                loc, label, prob = [r.cpu().numpy() for r in result] # numpy
-                for loc_, label_, prob_ in zip(loc, label, prob):
-                    # xyxy
-                    print(loc_[0] * width,
-                          loc_[1] * height,
-                          loc_[2] * width,
-                          loc_[3] * height)
+#                 height, width = img_size[idx]
+#                 loc, label, prob = [r.cpu() for r in result]
+#                 # 여기까지 tensor -> calculate_mAP
+            det_boxes = ploc
+            det_labels = plabel
+            det_scores = prob
+            true_boxes = gloc
+            true_labels = glabel
+
+            mAP = calculate_mAP(det_boxes,
+                                det_labels,
+                                det_scores,
+                                true_boxes,
+                                true_labels)
                 
-                    detections.append([img_id[idx],
-                                       loc_[0] * width,
-                                       loc_[1] * height,
-                                       loc_[2] * width,
-                                       loc_[3] * height,
-                                       prob_,
-                                       category_ids[label_ - 1]])
+#                 loc, label, prob = [r.cpu().numpy() for r in result] # numpy
+                
+#                 #------------------------------------------------------------------
+#                 for loc_, label_, prob_ in zip(loc, label, prob):
+#                     # xyxy
+#                     print(loc_[0] * width,
+#                           loc_[1] * height,
+#                           loc_[2] * width,
+#                           loc_[3] * height)
+                
+#                     detections.append([img_id[idx],
+#                                        loc_[0] * width,
+#                                        loc_[1] * height,
+#                                        loc_[2] * width,
+#                                        loc_[3] * height,
+#                                        prob_,
+#                                        category_ids[label_ - 1]])
 
-    print()
-    print(len(detections))
+#     print()
+#     print(len(detections))
 #     detections = np.array(detections, dtype=np.float32)
 #     return len(detections)
     

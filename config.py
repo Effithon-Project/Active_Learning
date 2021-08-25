@@ -6,7 +6,7 @@ NUM_TOT   = 7481
 NUM_TEST  = 2251 # N
 NUM_TRAIN = 4930 # N
 # NUM_VAL   = 4930 - NUM_TRAIN
-BATCH     = 10 # B
+BATCH     = 4 # B
 SUBSET    = 300 # M
 ADDENDUM  = 300 # K
 

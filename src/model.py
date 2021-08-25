@@ -16,7 +16,8 @@ class Base(nn.Module):
     def bbox_view(self, src, loc, conf):
         ret = []
         for s, l, c in zip(src, loc, conf):
-#             print((l(s).view(s.size(0), 4, -1)))
+            print("here")
+            print((l(s).view(s.size(0), 4, -1)).size())
             ret.append((l(s).view(s.size(0), 4, -1),
                         c(s).view(s.size(0),self.num_classes, -1)))
 
@@ -67,7 +68,7 @@ class SSD(Base):
     def _build_additional_features(self, input_size):
         self.additional_blocks = []
         for i, (input_size, output_size, channels) in enumerate(
-                zip(input_size[:-1], input_size[1:], [256, 256, 128, 128, 128])):
+                zip(input_size[:-1], input_size[1:], [256, 256, 128, 128, 128])): ##
             if i < 3:
                 layer = nn.Sequential(
                     nn.Conv2d(input_size, channels, kernel_size=1, bias=False),
@@ -93,6 +94,14 @@ class SSD(Base):
 
 
     def forward(self, x):
+        """
+        torch.Size([4, 1024, 34, 113])
+        torch.Size([4, 512, 17, 57])
+        torch.Size([4, 512, 9, 29])
+        torch.Size([4, 256, 5, 15])
+        torch.Size([4, 256, 3, 13])
+        torch.Size([4, 256, 1, 11])
+        """
         x = self.feature_extractor(x)
         detection_feed = [x]
         
@@ -103,6 +112,12 @@ class SSD(Base):
             x = l(x)
             detection_feed.append(x)
         
+#         print(detection_feed[0].size())
+#         print(detection_feed[1].size())
+#         print(detection_feed[2].size())
+#         print(detection_feed[3].size())
+#         print(detection_feed[4].size())
+#         print(detection_feed[5].size())
         locs, confs = self.bbox_view(detection_feed, self.loc, self.conf)
-        
+#         print(locs.size())
         return locs, confs, out_dict

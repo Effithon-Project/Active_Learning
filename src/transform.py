@@ -102,7 +102,7 @@ class RandomHorizontalFlip(object):
 
 
 class SSDTransformer(object):
-    def __init__(self, dboxes, size=(300, 300), val=False):
+    def __init__(self, dboxes, size=(300, 300), val=False):  # (h, w)
         self.size = size
         self.val = val
         self.dboxes = dboxes
@@ -118,7 +118,7 @@ class SSDTransformer(object):
             transforms.Resize(self.size),
 #             transforms.ColorJitter(brightness=0.125, contrast=0.5, saturation=0.5, hue=0.05),
             transforms.ToTensor(),
-            self.normalize
+#             self.normalize
         ])
         
         self.trans_val = transforms.Compose([
