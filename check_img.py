@@ -9,7 +9,7 @@ dboxes = generate_dboxes(model="ssd")
 encoder = Encoder(dboxes)
 
 kitti_tot = KittiDataset("D:\\", train=True,
-                         transform=SSDTransformer(dboxes, (300, 1000),val=False))
+                         transform=SSDTransformer(dboxes, (384, 1280),val=False))
 
 train_loader = DataLoader(kitti_tot)
 

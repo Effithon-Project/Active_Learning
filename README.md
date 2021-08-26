@@ -1,6 +1,6 @@
 **jungyeon working directory**
 
-> BEFORE running the code, you have to download Kitti dataset! And then, change the dataset directory in `main.py`.
+> BEFORE running the code, you have to download Kitti dataset! And then, change the dataset directory in `main.py`. [Download](http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=2d)
 
 ## Setting Virtual Environment with Anaconda
 
@@ -15,69 +15,57 @@
 If you can run `main.py`, the setting is done.
 
 # Active Learning for EFFICIENT Learning
-## Goals
-0. Confidence 기반 구현 먼저(08.18)
+## Goals: random sampling VS. confidence VS. LL4AL
+
+0. SSD(ResNet50) + Kitti(Object detection) + Confidence
 
 1. SSD(ResNet50) + Kitti(Object detection) + Learning loss
-    - base paper code [Github](https://github.com/Mephisto405/Learning-Loss-for-Active-Learning)
-    - ssd code [Github](https://github.com/uvipen/SSD-pytorch)
-    - (maybe later) https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+    - Learning loss code [Github](https://github.com/Mephisto405/Learning-Loss-for-Active-Learning)
+    - SSD(ResNet50) [Github](https://github.com/uvipen/SSD-pytorch)
+    - Kitti parameter [Github](https://github.com/seonghoon247/SSD-KITTI/blob/master/nets/ssd_vgg_384x1280.py)
+    - [maybe later](https://discuss.pytorch.org/t/solved-pytorch1-5-runtimeerror-one-of-the-variables-needed-for-gradient-computation-has-been-modified-by-an-inplace-operation/90256/7?fbclid=IwAR2qafREIOGt2vekmEE6cF0uVyoLQgoMerAWMHPIl3KVNt1vqup02T3lgnU) : PyTorch 1.5.0 이상 버전에서 model weight update와 관련된 inplace operation이 수정되면서 zero_grad -> backward -> step의 과정이 최적화하고자 하는 변수의 순서에 맞춰서 수행되어야 해결되는 것으로 알고 있습니다.
     
     ![](./img/code_structure.png)
     ![](./img/main_flow.png)
-    ![plan](./img/plan.png)
+    ![](./img/plan.png)
 
-2. 
-
-
----
-# Table
-- Papers & Articles
-    - `OB`
-    - `AL`
-    - `+RL`
-    - `+SSL`
-- Code Reference
-    - `KITTI`
-    - `SSD`
-    - `ETC`
-
----
-
-## Papers & Articles
-### OB
-- [Deep Learning for Generic Object Detection: A Survey](https://arxiv.org/pdf/1809.02165v1.pdf)
-- [Object Detection](https://github.com/hoya012/deep_learning_object_detection)
-- [Object detection: speed and accuracy comparison (Faster R-CNN, R-FCN, SSD, FPN, RetinaNet and YOLOv3)](https://jonathan-hui.medium.com/object-detection-speed-and-accuracy-comparison-faster-r-cnn-r-fcn-ssd-and-yolo-5425656ae359)
-- [Object-Detection-Object-Detection-튜토리얼](https://rain-bow.tistory.com/entry/Object-Detection-Object-Detection-%ED%8A%9C%ED%86%A0%EB%A6%AC%EC%96%BC)
-
-### AL
-- [1] [Learning Loss for Active Learning](https://arxiv.org/abs/1905.03677) : base
-- [2] [Learning to Rank for Active Learning: A Listwise Approach](https://ieeexplore.ieee.org/document/9412680)
-
-> if time permits
-
-### +RL
-- [Learning how to Active Learn: A Deep Reinforcement Learning Approach](https://arxiv.org/abs/1708.02383) : oracle에게 물어볼지를 action으로 적용한 nlp
-
-### +SSL
-- [Multiple Instance Active Object Detection (MI-AOD)](https://github.com/yuantn/MI-AOD) : 아직 이해 못함. 근데 적용해보면 좋을 듯
-- [Unbiased Teacher for Semi-Supervised Object Detection](https://ycliu93.github.io/projects/unbiasedteacher.html):ssd에는 안 맞긴 한데 아이디어 참고용
 
 ---
 
 ## Reference
 
-### KITTI
-- [kitti vis code](https://github.com/bostondiditeam/kitti/blob/master/tools/2D_BBox.ipynb) : random_vis.py 코드
-- [kitti label](https://github.com/bostondiditeam/kitti/blob/master/resources/devkit_object/readme.txt) : 라벨링 정보
-- [torchvision kitti](https://pytorch.org/vision/master/_modules/torchvision/datasets/kitti.html) : 중간에 계속 끊겨서 그냥 페이지에서 신청해서 다운 받음
-- [kitti dataloader pytorch](https://github.com/dusty-nv/pytorch-depth/blob/master/dataloaders/kitti_dataloader.py) : 데이터 로더 참고
-
 ### SSD
-- [nvidia_deeplearningexamples_ssd](https://pytorch.org/hub/nvidia_deeplearningexamples_ssd/) : ssd모델 그냥 불러오는 것 같은데 어떻게 수정할 수 있는지 모르겠음
-- [a-PyTorch-Tutorial-to-Object-Detection](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection)
-- [mAP 계산하기](https://herbwood.tistory.com/3)
+1. [[논문] SSD: Single Shot Multibox Detector 분석](https://taeu.github.io/paper/deeplearning-paper-ssd/)
+2. [갈아먹는 Object Detection [6] SSD](https://yeomko.tistory.com/20)
+3. [mAP 계산하기](https://herbwood.tistory.com/3)
+4. [Object Detection](https://github.com/hoya012/deep_learning_object_detection)
+5. [Object-Detection-Object-Detection-튜토리얼](https://rain-bow.tistory.com/entry/Object-Detection-Object-Detection-%ED%8A%9C%ED%86%A0%EB%A6%AC%EC%96%BC)
+6. [Object detection: speed and accuracy comparison (Faster R-CNN, R-FCN, SSD, FPN, RetinaNet and YOLOv3)](https://jonathan-hui.medium.com/object-detection-speed-and-accuracy-comparison-faster-r-cnn-r-fcn-ssd-and-yolo-5425656ae359)
+7. [Deep Learning for Generic Object Detection: A Survey](https://arxiv.org/pdf/1809.02165v1.pdf)
+8. [a-PyTorch-Tutorial-to-Object-Detection](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection)
+9. [nvidia_deeplearningexamples_ssd](https://pytorch.org/hub/nvidia_deeplearningexamples_ssd/)
 
-### ETC
+
+### AL
+1. [Learning Loss for Active Learning](https://arxiv.org/abs/1905.03677) : base
+2. [Learning to Rank for Active Learning: A Listwise Approach](https://ieeexplore.ieee.org/document/9412680)
+
+### KITTI
+1. [kitti vis code](https://github.com/bostondiditeam/kitti/blob/master/tools/2D_BBox.ipynb) : random_vis.py 코드
+2. [kitti label](https://github.com/bostondiditeam/kitti/blob/master/resources/devkit_object/readme.txt) : 라벨링 정보
+3. [kitti dataloader pytorch](https://github.com/dusty-nv/pytorch-depth/blob/master/dataloaders/kitti_dataloader.py) : dataset.py
+
+
+---
+
+## ETC
 - [argparse](https://m.blog.naver.com/cjh226/220997049388)
+
+> if time permits
+
+### +RL
+- [Learning how to Active Learn: A Deep Reinforcement Learning Approach](https://arxiv.org/abs/1708.02383) 
+
+### +SSL
+- [Multiple Instance Active Object Detection (MI-AOD)](https://github.com/yuantn/MI-AOD) 
+- [Unbiased Teacher for Semi-Supervised Object Detection](https://ycliu93.github.io/projects/unbiasedteacher.html)
