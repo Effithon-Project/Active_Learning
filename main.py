@@ -38,6 +38,7 @@ from src.dataset import collate_fn, KittiDataset
 from src.metric import *
 
 import warnings
+from scipy.stats import entropy
 warnings.filterwarnings("ignore")
 
 
@@ -105,6 +106,7 @@ def train_epoch(models,
         img = img.cuda()
         gloc = gloc.cuda() # gt localization
         glabel = glabel.cuda() # gt label
+        # Size([2, 45976])
         
         optimizers['backbone'].zero_grad() # ssd
         optimizers['module'].zero_grad() # ll4al
@@ -113,7 +115,10 @@ def train_epoch(models,
         ploc, plabel, out_dict = models['backbone'](img)
 
         ploc, plabel = ploc.float(), plabel.float()
+#         print(plabel.size()) # torch.Size([2, 9, 45976])
+        # entropy -> plabel 45976개에 대한 평균
         gloc = gloc.transpose(1, 2).contiguous()
+#         print(glabel[0]) 
         
         target_loss = criterion(ploc, plabel, gloc, glabel) # confidence 기반
         
@@ -128,15 +133,7 @@ def train_epoch(models,
         loss            = m_backbone_loss + WEIGHT * m_module_loss
         
 #         progress_bar.set_description("Epoch: {}. Loss: {:.5f}".format(epoch + 1, loss.item()))
-        print("-"*50)
-        print("target_loss=", target_loss.size())
-        print("pred_loss=", pred_loss.size())
-        print("m_backbone_loss=", m_backbone_loss.size())
-        print("m_module_loss=", m_module_loss.size())
-        print("loss=", loss.size())
-        print(loss)
-        print("-"*50)
-        
+
         loss.backward()
         optimizers['backbone'].step()
         optimizers['module'].step()
@@ -151,6 +148,7 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
     models['module'].eval()
     
     detections = []
+    groundtruthes = []
     category_ids = [i for i in range(9)]
     test_loader = dataloaders['test']
     
@@ -158,47 +156,98 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
         print("Parsing batch: {}/{}".format(nbatch, len(test_loader)), end="\r")
 
         img = img.cuda()
-        gloc = gloc.cuda() # gt localization
-        glabel = glabel.cuda() # gt label
+#         gloc, glabel
+#         print("gloc:", gloc.size()) # gloc: torch.Size([2, 45976, 4])
+#         print("glabel:", glabel.size()) # glabel: torch.Size([2, 45976])
+#         print(glabel[0][glabel[0]!=0])
+#         print("_"*50, sum(sum(gloc<0))) # tensor([0.0031, 0.0104, 0.2000, 0.2000])
+#         print(glabel[0][2])
 
         with torch.no_grad():
             # Get predictions
             ploc, plabel, out_dict = models['backbone'](img)
             ploc, plabel = ploc.float(), plabel.float()
-            gloc = gloc.transpose(1, 2).contiguous()
             
             # batch 묶음에서 이미지 하나 가져오기 idx:0,1,2,3,4,...
-#             for idx in range(ploc.shape[0]):
-#                 ploc_i = ploc[idx, :, :].unsqueeze(0)
-#                 plabel_i = plabel[idx, :, :].unsqueeze(0)
-#                 try:
-#                     result = encoder.decode_batch(ploc_i,
-#                                                   plabel_i,
-#                                                   nms_threshold,
-#                                                   200)[0]
-# #                     print(result[0].size()) # torch.Size([200, 4]) bbox
-# #                 bboxes_out[max_ids, :], labels_out[max_ids], scores_out[max_ids]
-#                 except:
-#                     print("No object detected in idx: {}".format(idx))
+            for idx in range(ploc.shape[0]):
+                ploc_i = ploc[idx, :, :].unsqueeze(0)
+                plabel_i = plabel[idx, :, :].unsqueeze(0)
+                #----------------------------------------------------------
+#                 gloc_i = gloc[idx, :, :].unsqueeze(0)
+#                 glabel_i = glabel[idx, :, :].unsqueeze(0)
+#                 print(glabel_i.size())
+                #----------------------------------------------------------
+                print("*"*50, sum(sum(ploc_i<0)))# 음수 값 원인 찾아내기
+                try:
+                    result = encoder.decode_batch(ploc_i, plabel_i, nms_threshold, 200)[0] # decoding
+                except:
+                    print("No object detected in idx: {}".format(idx))
+                    continue
 
-#                 height, width = img_size[idx]
-#                 loc, label, prob = [r.cpu() for r in result]
-#                 # 여기까지 tensor -> calculate_mAP
-            det_boxes = ploc
-            det_labels = plabel
-            det_scores = prob
-            true_boxes = gloc
-            true_labels = glabel
+                height, width = img_size[idx]
+                
+#                 loc, label, prob = [r.cpu().numpy() for r in result]
+                loc, label, prob = [r.cpu() for r in result]
+                print("="*50, sum(loc<0))
+                
+                # 여기까지 tensor
+                det_boxes = loc
+                det_labels = label
+                det_scores = prob
+                
+                true_boxes = gloc
+                true_labels = glabel
+                
+                mAP = calculate_mAP(det_boxes,
+                                      det_labels,
+                                      det_scores,
+                                      true_boxes,
+                                      true_labels)
+                
+                
+                
+                
+                
+                for loc_, label_, prob_ in zip(loc, label, prob):
+#                     print(loc_[0] * width,
+#                           loc_[1] * height,
+#                           (loc_[2] - loc_[0]) * width,
+#                           (loc_[3] - loc_[1]) * height)
 
-            mAP = calculate_mAP(det_boxes,
-                                det_labels,
-                                det_scores,
-                                true_boxes,
-                                true_labels)
-                
-#                 loc, label, prob = [r.cpu().numpy() for r in result] # numpy
-                
-#                 #------------------------------------------------------------------
+                    detections.append([img_id[idx],
+                                       loc_[0] * width,
+                                       loc_[1] * height,
+                                       (loc_[2] - loc_[0]) * width,
+                                       (loc_[3] - loc_[1]) * height,
+                                       prob_,
+                                       category_ids[label_ - 1]])
+    
+#                     print("detections:", len(detections))
+        
+#     detections = np.array(detections, dtype=np.float32)
+#     print(detections)
+    
+            
+            
+#             gloc = gloc.transpose(1, 2).contiguous(
+          
+# -----------------------------------------------------------------------------------------------------
+
+#             det_boxes = ploc
+#             psocres, indices = torch.sort(plabel, 1) # torch.Size([2, 9, 45976])
+            
+#             det_labels = plabel
+#             det_scores = psocres
+#             true_boxes = gloc
+#             true_labels = glabel
+
+#             mAP = calculate_mAP(det_boxes,
+#                                 det_labels,
+#                                 det_scores,
+#                                 true_boxes,
+#                                 true_labels)
+# -----------------------------------------------------------------------------------------------------
+
 #                 for loc_, label_, prob_ in zip(loc, label, prob):
 #                     # xyxy
 #                     print(loc_[0] * width,
@@ -295,6 +344,29 @@ def get_uncertainty(models, unlabeled_loader):
             uncertainty = torch.cat((uncertainty, pred_loss), 0)
     
     return uncertainty.cpu()
+
+def get_entropy(models, unlabeled_loader):
+    """
+    entropy
+    """
+    models['backbone'].eval()
+    entropy = torch.tensor([]).cuda()
+
+    with torch.no_grad():
+        for i, (img, _, _, gloc, glabel) in enumerate(unlabeled_loader):
+            img = img.cuda()
+            
+            ploc, plabel, _ = models['backbone'](img)
+            # entropy plabel
+            batch_entropy = torch.tensor([]).cuda()
+            for i in range(len(plabel)):
+                entropy_i = entropy(plabel[i].cpu(), base=2)
+                entropy_i = np.mean(entropy_i)
+                batch_entropy = torch.cat((entropy_i, torch.from_numpy([entropy_i])).cuda(), 0)
+                
+            entropy = torch.cat((entropy, batch_entropy), 0)
+    
+    return entropy.cpu()
 
 
 if __name__ == '__main__':
@@ -411,6 +483,7 @@ if __name__ == '__main__':
 
             # Measure uncertainty of each data points in the subset
             uncertainty = get_uncertainty(models, unlabeled_loader)
+            # get_entropy
 
             # Index in ascending order
             arg = np.argsort(uncertainty)

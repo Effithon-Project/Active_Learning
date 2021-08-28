@@ -28,11 +28,7 @@ def generate_dboxes(model="ssd"):
                     [2, .5, 3, 1./3],
                     [2, .5, 3, 1./3],
                     [2, .5],
-                    [2, .5]]
-    
-    # [[2], [2, 3], [2, 3], [2, 3], [2], [2]] # 4 6 6 6 4 4 
-    
-
+                    [2, .5]] # 4 6 6 6 4 4 
 
     #  DefaultBoxes------------------------------------------------------->
     dboxes = DefaultBoxes(figsize, feat_size, steps_h, steps_w, scales, aspect_ratios)
@@ -147,7 +143,7 @@ class Encoder(object):
         best_dbox_ious.index_fill_(0, best_bbox_idx, 2.0)
 
         idx = torch.arange(0, best_bbox_idx.size(0), dtype=torch.int64)
-        best_dbox_idx[best_bbox_idx[idx]] = idx
+        best_dbox_idx[best_bbox_idx[idx]] = idxs
 
         # filter IoU > 0.5
         masks = best_dbox_ious > criteria
@@ -178,6 +174,7 @@ class Encoder(object):
 
         bboxes_in[:, :, :2] = bboxes_in[:, :, :2] * self.dboxes_xywh[:, :, 2:] + self.dboxes_xywh[:, :, :2]
         bboxes_in[:, :, 2:] = bboxes_in[:, :, 2:].exp() * self.dboxes_xywh[:, :, 2:]
+        
         bboxes_in = box_convert(bboxes_in, in_fmt="cxcywh", out_fmt="xyxy")
 
         return bboxes_in, F.softmax(scores_in, dim=-1)
@@ -235,6 +232,55 @@ class Encoder(object):
         _, max_ids = scores_out.sort(dim=0)
         max_ids = max_ids[-max_output:]
         return bboxes_out[max_ids, :], labels_out[max_ids], scores_out[max_ids]
+    
+    
+#     def decode_gt(self, bboxes_in, scores_in):
+#         bboxes_out = []
+# #         scores_out = []
+#         labels_out = []
+
+#         for i, score in enumerate(scores_in.split(1, 1)):
+#             if i == 0:
+#                 continue
+
+# #             score = score.squeeze(1)
+# #             mask = score > 0.05
+
+# #             bboxes, score = bboxes_in[mask, :], score[mask]
+#             bboxes, score = bboxes_in, scores_in
+#             if score.size(0) == 0: continue
+
+# #             score_sorted, score_idx_sorted = score.sort(dim=0)
+
+# #             # select max_output indices
+# #             score_idx_sorted = score_idx_sorted[-max_num:]
+# #             candidates = []
+
+# #             while score_idx_sorted.numel() > 0:
+# #                 idx = score_idx_sorted[-1].item()
+                
+# #             bboxes_sorted = bboxes
+# #             bboxes_idx = bboxes[idx, :].unsqueeze(dim=0)
+                
+# #                 iou_sorted = box_iou(bboxes_sorted, bboxes_idx).squeeze()
+#                 # we only need iou < nms_threshold
+# #                 score_idx_sorted = score_idx_sorted[iou_sorted < nms_threshold]
+# #                 candidates.append(idx)
+
+#             bboxes_out.append(bboxes)
+#             scores_out.append(score)
+#             labels_out.extend([i])
+
+#         if not bboxes_out:
+#             return [torch.tensor([]) for _ in range(3)]
+
+#         bboxes_out, labels_out, scores_out = torch.cat(bboxes_out, dim=0), \
+#                                              torch.tensor(labels_out, dtype=torch.long), \
+#                                              torch.cat(scores_out, dim=0)
+
+#         _, max_ids = scores_out.sort(dim=0)
+#         max_ids = max_ids[-max_output:]
+#         return bboxes_out[max_ids, :], labels_out[max_ids]
 
 
 

@@ -97,23 +97,18 @@ class SSD(Base):
 
 
     def forward(self, x):
-        
+        out_dict = {}
         x = self.feature_extractor(x)
+        out_dict[0] = x
         detection_feed = [x]
         
-        # out 1,2,3,4,5
-        out_dict = {}
-        for i, l in enumerate(self.additional_blocks):
-            out_dict[i] = x
-            x = l(x)
-            detection_feed.append(x)
+        # out 1,2,3,4,5,6
         
-#         print(detection_feed[0].size())
-#         print(detection_feed[1].size())
-#         print(detection_feed[2].size())
-#         print(detection_feed[3].size())
-#         print(detection_feed[4].size())
-#         print(detection_feed[5].size())
+        for i, l in enumerate(self.additional_blocks):
+            
+            x = l(x)
+            out_dict[i+1] = x
+            detection_feed.append(x)
+
         locs, confs = self.bbox_view(detection_feed, self.loc, self.conf)
-#         print(locs.size())
         return locs, confs, out_dict

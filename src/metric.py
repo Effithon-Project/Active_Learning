@@ -14,10 +14,12 @@ def calculate_mAP(det_boxes,
     See https://medium.com/@jonathan_hui/map-mean-average-precision-for-object-detection-45c121a31173 for an explanation
     :param det_boxes: list of tensors, one tensor for each image
                     containing detected objects' bounding boxes -> loc
+    --------------------------------------------------------------------------                
     :param det_labels: list of tensors, one tensor for each image 
                     containing detected objects' labels
     :param det_scores: list of tensors, one tensor for each image 
                     containing detected objects' labels' scores
+    --------------------------------------------------------------------------                    
     :param true_boxes: list of tensors, one tensor for each image
                     containing actual objects' bounding boxes
     :param true_labels: list of tensors, one tensor for each image 
@@ -32,17 +34,18 @@ def calculate_mAP(det_boxes,
     """
     assert len(det_boxes) == len(det_labels) == len(det_scores) == len(true_boxes) == len(
         true_labels) #== len(true_difficulties)  # these are all lists of tensors of the same length, i.e. number of images
-    n_classes = len(label_map)
+    
+    n_classes = 9
 
     # Store all (true) objects in a single continuous tensor while keeping track of the image it is from
     true_images = list()
+    
     for i in range(len(true_labels)):
         true_images.extend([i] * true_labels[i].size(0))
-    true_images = torch.LongTensor(true_images).to(
-        device)  # (n_objects), n_objects is the total no. of objects across all images
+        
+    true_images = torch.LongTensor(true_images).to(device)  # (n_objects), n_objects is the total no. of objects across all images
     true_boxes = torch.cat(true_boxes, dim=0)  # (n_objects, 4)
     true_labels = torch.cat(true_labels, dim=0)  # (n_objects)
-#     true_difficulties = torch.cat(true_difficulties, dim=0)  # (n_objects)
 
     assert true_images.size(0) == true_boxes.size(0) == true_labels.size(0)
 
