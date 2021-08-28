@@ -34,18 +34,13 @@ class LossNet(nn.Module):
         self.linear = nn.Linear(5 * interm_dim, 1) # 5x128 = 640 -> 1
     
     def forward(self, features):
-        """
-        torch.Size([4, 1024, 38, 38])
-        torch.Size([4, 512, 19, 19])
-        torch.Size([4, 512, 10, 10])
-        torch.Size([4, 256, 5, 5])
-        torch.Size([4, 256, 3, 3])
-        """
+        print("="*50)
         print(features[0].size())
         print(features[1].size())
         print(features[2].size())
         print(features[3].size())
         print(features[4].size())
+        print("="*50)
         
         out1 = self.GAP1(features[0]) # 32
         out1 = out1.view(out1.size(0), -1)

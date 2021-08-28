@@ -106,30 +106,14 @@ def train_epoch(models,
         gloc = gloc.cuda() # gt localization
         glabel = glabel.cuda() # gt label
         
-        optimizers['backbone'].zero_grad()
-        optimizers['module'].zero_grad()
+        optimizers['backbone'].zero_grad() # ssd
+        optimizers['module'].zero_grad() # ll4al
 
         # locs, confs // predicted localization, predicted label
         ploc, plabel, out_dict = models['backbone'](img)
-#         print(out_dict[0].size())
-#         print(out_dict[1].size())
-#         print(out_dict[2].size())
-#         print(out_dict[3].size())
-#         print(out_dict[4].size())
-# #         print(out_dict[5].size())
+
         ploc, plabel = ploc.float(), plabel.float()
-#         print(gloc.size())
         gloc = gloc.transpose(1, 2).contiguous()
-#         print(gloc.size())
-        
-        print("="*100)
-        print("ploc: ",ploc.size())
-        print("gloc: ",gloc.size())
-#         print(gloc)
-#         print("="*100)
-#         print("plabel: ",plabel.size())
-#         print("glabel: ",glabel.size())
-#         print(glabel)
         
         target_loss = criterion(ploc, plabel, gloc, glabel) # confidence 기반
         
@@ -143,7 +127,15 @@ def train_epoch(models,
         m_module_loss   = LossPredLoss(pred_loss, target_loss, margin=MARGIN)
         loss            = m_backbone_loss + WEIGHT * m_module_loss
         
-        progress_bar.set_description("Epoch: {}. Loss: {:.5f}".format(epoch + 1, loss.item()))
+#         progress_bar.set_description("Epoch: {}. Loss: {:.5f}".format(epoch + 1, loss.item()))
+        print("-"*50)
+        print("target_loss=", target_loss.size())
+        print("pred_loss=", pred_loss.size())
+        print("m_backbone_loss=", m_backbone_loss.size())
+        print("m_module_loss=", m_module_loss.size())
+        print("loss=", loss.size())
+        print(loss)
+        print("-"*50)
         
         loss.backward()
         optimizers['backbone'].step()
@@ -308,7 +300,7 @@ def get_uncertainty(models, unlabeled_loader):
 if __name__ == '__main__':
 
 #     vis = visdom.Visdom(server='http://localhost', port=9000)
-    plot_data = {'X': [], 'Y': [], 'legend': ['Backbone Loss', 'Module Loss', 'Total Loss']}
+#     plot_data = {'X': [], 'Y': [], 'legend': ['Backbone Loss', 'Module Loss', 'Total Loss']}
 
     for trial in range(TRIALS):
         # train : test = 7:3
@@ -343,6 +335,7 @@ if __name__ == '__main__':
         
         # backbone
         model = SSD(backbone=ResNet(), num_classes=len(kitti_classes)).cuda()
+#         print(model)
         # Loss model
         loss_module = lossnet.LossNet().cuda() 
         
@@ -443,4 +436,4 @@ if __name__ == '__main__':
         torch.save({'trial': trial + 1,
                     'state_dict_backbone': models['backbone'].state_dict(),
                     'state_dict_module': models['module'].state_dict()},
-            './ckpt/train/weights/active_resnet50_kitti_trial{}.pth'.format(trial))
+                   './ckpt/weights/active_resnet50_kitti_trial{}.pth'.format(trial))

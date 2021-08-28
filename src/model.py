@@ -16,9 +16,9 @@ class Base(nn.Module):
     def bbox_view(self, src, loc, conf):
         ret = []
         for s, l, c in zip(src, loc, conf):
-            print("-"*100)
-            print("ploc from one feature map: ",(l(s).view(s.size(0), 4, -1)).size())
-            print("plabel from one feature map: ",(c(s).view(s.size(0),self.num_classes, -1)).size())
+#             print("-"*100)
+#             print("ploc from one feature map: ",(l(s).view(s.size(0), 4, -1)).size())
+#             print("plabel from one feature map: ",(c(s).view(s.size(0),self.num_classes, -1)).size())
             ret.append((l(s).view(s.size(0), 4, -1),
                         c(s).view(s.size(0),self.num_classes, -1)))
 
@@ -55,8 +55,8 @@ class SSD(Base):
         self.feature_extractor = backbone
         self.num_classes = num_classes
 
-        self._build_additional_features(self.feature_extractor.out_channels)
-        self.num_defaults = [4, 6, 6, 6, 4, 4]
+        self._build_additional_features(self.feature_extractor.out_channels) # oc [1024, 512, 512, 256, 256, 256]
+        self.num_defaults = [4, 6, 6, 6, 4, 4] # nd
         self.loc = []
         self.conf = []
 
@@ -71,8 +71,8 @@ class SSD(Base):
         self.additional_blocks = []
         
         for i, (input_size, output_size, channels) in enumerate(
-                zip(input_size[:-1], input_size[1:], [256, 256, 128, 128, 128])): ##
-            if i < 3:
+                zip(input_size[:-1], input_size[1:], [256, 256, 128, 128, 128])): ##----------
+            if i < 4:
                 layer = nn.Sequential(
                     nn.Conv2d(input_size, channels, kernel_size=1, bias=False),
                     nn.BatchNorm2d(channels),
@@ -86,7 +86,7 @@ class SSD(Base):
                     nn.Conv2d(input_size, channels, kernel_size=1, bias=False),
                     nn.BatchNorm2d(channels),
                     nn.ReLU(inplace=True),
-                    nn.Conv2d(channels, output_size, kernel_size=3, bias=False),
+                    nn.Conv2d(channels, output_size, kernel_size=3, stride=2, bias=False),
                     nn.BatchNorm2d(output_size),
                     nn.ReLU(inplace=True),
                 )
@@ -97,14 +97,7 @@ class SSD(Base):
 
 
     def forward(self, x):
-        """
-        torch.Size([4, 1024, 34, 113])
-        torch.Size([4, 512, 17, 57])
-        torch.Size([4, 512, 9, 29])
-        torch.Size([4, 256, 5, 15])
-        torch.Size([4, 256, 3, 13])
-        torch.Size([4, 256, 1, 11])
-        """
+        
         x = self.feature_extractor(x)
         detection_feed = [x]
         
@@ -115,12 +108,12 @@ class SSD(Base):
             x = l(x)
             detection_feed.append(x)
         
-        print(detection_feed[0].size())
-        print(detection_feed[1].size())
-        print(detection_feed[2].size())
-        print(detection_feed[3].size())
-        print(detection_feed[4].size())
-        print(detection_feed[5].size())
+#         print(detection_feed[0].size())
+#         print(detection_feed[1].size())
+#         print(detection_feed[2].size())
+#         print(detection_feed[3].size())
+#         print(detection_feed[4].size())
+#         print(detection_feed[5].size())
         locs, confs = self.bbox_view(detection_feed, self.loc, self.conf)
 #         print(locs.size())
         return locs, confs, out_dict

@@ -13,11 +13,15 @@ def generate_dboxes(model="ssd"):
         
     figsize = (384, 1280)
 
-    feat_size =  [(48, 160), (24, 80), (12, 40), (6, 20), (4, 18), (2, 16)]
+    feat_size =  [(48, 160), (24, 80), (12, 40), (6, 20), (3, 10), (1, 4)] # sfeat (h,w)
 
-    steps = [8, 16, 32, 64, 100, 300]
+    steps_h = [8, 16, 32, 64, 128, 384] 
+    steps_w = [8, 16, 32, 64, 128, 320]
 
-    scales = [(21., 45.),(45., 99.),(99., 153.),(153., 207.),(207., 261.),(261., 315.), (315,345)]
+    scales = [(384*0.2, 1280*0.2), (384*0.34, 1280*0.34),
+              (384*0.48, 1280*0.48), (384*0.62, 1280*0.62),
+              (384*0.76, 1284*0.76), (384*0.9, 1280*0.9), 
+              (384*1.03, 1280*1.03)]
 
     aspect_ratios = [[2, .5],
                     [2, .5, 3, 1./3],
@@ -25,55 +29,91 @@ def generate_dboxes(model="ssd"):
                     [2, .5, 3, 1./3],
                     [2, .5],
                     [2, .5]]
+    
+    # [[2], [2, 3], [2, 3], [2, 3], [2], [2]] # 4 6 6 6 4 4 
+    
+
 
     #  DefaultBoxes------------------------------------------------------->
-    dboxes = DefaultBoxes(figsize, feat_size, steps, scales, aspect_ratios)
+    dboxes = DefaultBoxes(figsize, feat_size, steps_h, steps_w, scales, aspect_ratios)
 
     return dboxes
 
 class DefaultBoxes(object):
     
-    def __init__(self, fig_size, feat_size, steps, scales, aspect_ratios, scale_xy=0.1, scale_wh=0.2):
+    def __init__(self,
+                 fig_size,
+                 feat_size,
+                 steps_h,
+                 steps_w,
+                 scales,
+                 aspect_ratios,
+                 scale_xy=0.1,
+                 scale_wh=0.2):
         
         self.fig_size = fig_size                  
         self.feat_size = feat_size                
-        self.steps = steps                        
+        self.steps_h = steps_h   
+        self.steps_w = steps_w  
         self.scales = scales                      
         self.aspect_ratios = aspect_ratios        
         self.scale_xy = scale_xy                  
-        self.scale_wh = scale_wh                  
+        self.scale_wh = scale_wh
         
-        fk_w = fig_size[1] / np.array(steps)
-        fk_h = fig_size[0] / np.array(steps)
-
+        fk_h = fig_size[0] / np.array(steps_h)
+        fk_w = fig_size[1] / np.array(steps_w)
+#         print(fk_h)
+#         print(fk_w)
         
         self.default_boxes = []
         
         for idx, sfeat in enumerate(self.feat_size):
-
-            sk1_h = scales[idx][0] / fig_size[0] # 300
-            sk1_w = scales[idx][1] / fig_size[1] # 1000
 #             print(idx)
+            
+            # S_k
+            sk1_h = scales[idx][0] / fig_size[0] # 384
+            sk1_w = scales[idx][1] / fig_size[1] # 1280
+            # S_k+1
             sk2_h = scales[idx + 1][0] / fig_size[0]
             sk2_w = scales[idx + 1][1] / fig_size[1]
-
+            
+            # S_k prime
             sk3_h = sqrt(sk1_h * sk2_h)
             sk3_w = sqrt(sk1_w * sk2_w)
             
-            all_sizes = [(sk1_w, sk1_h), (sk3_w, sk3_h)]
+            all_sizes = [(sk1_w, sk1_h), (sk3_w, sk3_h)] # min, max, scale 1
 
             for alpha in aspect_ratios[idx]:
-                w, h = sk1_w * sqrt(alpha), sk1_h / sqrt(alpha)
-                all_sizes.append((w, h))
-                all_sizes.append((h, w))
+#                 # 4 6 6 6 4 4 
+#                 [[2, .5],
+#                  [2, .5, 3, 1./3],
+#                  [2, .5, 3, 1./3],
+#                  [2, .5, 3, 1./3],
+#                  [2, .5],
+#                  [2, .5]]
                 
+                w, h = sk1_w * sqrt(alpha), sk1_h / sqrt(alpha)
+            
+                all_sizes.append((w, h)) 
+                
+#             print(len(all_sizes))
+        
             for w, h in all_sizes:
+#                 print("w", w, "h", h)
                 for i, j in itertools.product(range(sfeat[0]), range(sfeat[1])):
-
+                    # i = height, j = width
+#                     print(fk_w)
+#                     print(fk_h)
                     cx, cy = (j + 0.5) / fk_w[idx], (i + 0.5) / fk_h[idx]
+#                     print("here")
                     self.default_boxes.append((cx, cy, w, h))
-
+                    
+#         print(type(self.default_boxes))
+#         print(len(self.default_boxes)) # 45976
+#         print(len(self.default_boxes[0])) # 4
+#         print(self.default_boxes[0]) # (array([0.003125, 0.003125]), array([0.01041667, 0.01041667]), 0.2, 0.20000000000000004)
         self.dboxes = torch.tensor(self.default_boxes, dtype=torch.float)
+        
         self.dboxes.clamp_(min=0, max=1)
         
         self.dboxes_ltrb = box_convert(self.dboxes, in_fmt="cxcywh", out_fmt="xyxy")

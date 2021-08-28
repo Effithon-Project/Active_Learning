@@ -2,3 +2,5 @@
 __pycache__/
 ckpt/
 SSD-pytorch-main/
+ssd_defaultbox_generator-master/
+pytorch-ssd-master/

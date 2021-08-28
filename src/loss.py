@@ -61,4 +61,7 @@ class Loss(nn.Module):
         num_mask = (pos_num > 0).float()
         pos_num = pos_num.float().clamp(min=1e-6)
         ret = (total_loss * num_mask / pos_num)
+        
+#         print(ret)
+#         print("----------------------here")
         return ret
