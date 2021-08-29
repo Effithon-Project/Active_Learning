@@ -9,22 +9,16 @@ import numpy as np
 # import visdom
 from tqdm import tqdm
 import shutil
-
-from torch.utils.data import DataLoader
-from torch.utils.data.sampler import SubsetRandomSampler
-# nn
 import torch
 import torch.nn as nn
-
-# learning
+from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.optim.lr_scheduler import MultiStepLR
-# torchvision
 import torchvision.transforms as T
 import torchvision.models as models
 from torchvision.datasets import Kitti 
-
 # custom utils from base code
 from config import *
 import src.lossnet as lossnet
@@ -36,11 +30,10 @@ from src.loss import Loss
 from src.dataset import collate_fn, KittiDataset
 # map
 from src.metric import *
-
-import warnings
 from scipy.stats import entropy
-warnings.filterwarnings("ignore")
+import warnings
 
+warnings.filterwarnings("ignore")
 
 # seed
 random.seed("Jungyeon")
@@ -105,8 +98,7 @@ def train_epoch(models,
     for i, (img, _, _, gloc, glabel) in enumerate(progress_bar):
         img = img.cuda()
         gloc = gloc.cuda() # gt localization
-        glabel = glabel.cuda() # gt label
-        # Size([2, 45976])
+        glabel = glabel.cuda() # gt label # Size([2, 45976])
         
         optimizers['backbone'].zero_grad() # ssd
         optimizers['module'].zero_grad() # ll4al
@@ -115,12 +107,11 @@ def train_epoch(models,
         ploc, plabel, out_dict = models['backbone'](img)
 
         ploc, plabel = ploc.float(), plabel.float()
-#         print(plabel.size()) # torch.Size([2, 9, 45976])
+        # plabel.size() == torch.Size([2, 9, 45976])
         # entropy -> plabel 45976개에 대한 평균
         gloc = gloc.transpose(1, 2).contiguous()
-#         print(glabel[0]) 
         
-        target_loss = criterion(ploc, plabel, gloc, glabel) # confidence 기반
+        target_loss = criterion(ploc, plabel, gloc, glabel)
         
         features = out_dict
         pred_loss = models['module'](features) 
@@ -156,12 +147,7 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
         print("Parsing batch: {}/{}".format(nbatch, len(test_loader)), end="\r")
 
         img = img.cuda()
-#         gloc, glabel
-#         print("gloc:", gloc.size()) # gloc: torch.Size([2, 45976, 4])
-#         print("glabel:", glabel.size()) # glabel: torch.Size([2, 45976])
-#         print(glabel[0][glabel[0]!=0])
-#         print("_"*50, sum(sum(gloc<0))) # tensor([0.0031, 0.0104, 0.2000, 0.2000])
-#         print(glabel[0][2])
+        # gloc: tensor([0.0031, 0.0104, 0.2000, 0.2000])
 
         with torch.no_grad():
             # Get predictions
@@ -177,9 +163,10 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
 #                 glabel_i = glabel[idx, :, :].unsqueeze(0)
 #                 print(glabel_i.size())
                 #----------------------------------------------------------
-                print("*"*50, sum(sum(ploc_i<0)))# 음수 값 원인 찾아내기
+                print("*"*50, sum(sum(sum(ploc_i<0)))) # 음수 값 원인 찾아내기
                 try:
-                    result = encoder.decode_batch(ploc_i, plabel_i, nms_threshold, 200)[0] # decoding
+                    # decoding NMS
+                    result = encoder.decode_batch(ploc_i, plabel_i, nms_threshold, 200)[0] 
                 except:
                     print("No object detected in idx: {}".format(idx))
                     continue
@@ -199,13 +186,10 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
                 true_labels = glabel
                 
                 mAP = calculate_mAP(det_boxes,
-                                      det_labels,
-                                      det_scores,
-                                      true_boxes,
-                                      true_labels)
-                
-                
-                
+                                    det_labels,
+                                    det_scores,
+                                    true_boxes,
+                                    true_labels)
                 
                 
                 for loc_, label_, prob_ in zip(loc, label, prob):
@@ -223,52 +207,8 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
                                        category_ids[label_ - 1]])
     
 #                     print("detections:", len(detections))
-        
 #     detections = np.array(detections, dtype=np.float32)
 #     print(detections)
-    
-            
-            
-#             gloc = gloc.transpose(1, 2).contiguous(
-          
-# -----------------------------------------------------------------------------------------------------
-
-#             det_boxes = ploc
-#             psocres, indices = torch.sort(plabel, 1) # torch.Size([2, 9, 45976])
-            
-#             det_labels = plabel
-#             det_scores = psocres
-#             true_boxes = gloc
-#             true_labels = glabel
-
-#             mAP = calculate_mAP(det_boxes,
-#                                 det_labels,
-#                                 det_scores,
-#                                 true_boxes,
-#                                 true_labels)
-# -----------------------------------------------------------------------------------------------------
-
-#                 for loc_, label_, prob_ in zip(loc, label, prob):
-#                     # xyxy
-#                     print(loc_[0] * width,
-#                           loc_[1] * height,
-#                           loc_[2] * width,
-#                           loc_[3] * height)
-                
-#                     detections.append([img_id[idx],
-#                                        loc_[0] * width,
-#                                        loc_[1] * height,
-#                                        loc_[2] * width,
-#                                        loc_[3] * height,
-#                                        prob_,
-#                                        category_ids[label_ - 1]])
-
-#     print()
-#     print(len(detections))
-#     detections = np.array(detections, dtype=np.float32)
-#     return len(detections)
-    
-
 
 def train(models,
           criterion,
@@ -322,9 +262,7 @@ def train(models,
     
     
 def get_uncertainty(models, unlabeled_loader):
-    """
-    data selecting을 위한 uncertainty 계산
-    """
+    
     models['backbone'].eval()
     models['module'].eval()
     uncertainty = torch.tensor([]).cuda()
@@ -332,8 +270,6 @@ def get_uncertainty(models, unlabeled_loader):
     with torch.no_grad():
         for i, (img, _, _, gloc, glabel) in enumerate(unlabeled_loader):
             img = img.cuda()
-#             gloc = gloc.cuda() # gt localization
-#             glabel = glabel.cuda() # gt label
             
             ploc, plabel, out_dict = models['backbone'](img)
 
@@ -407,7 +343,6 @@ if __name__ == '__main__':
         
         # backbone
         model = SSD(backbone=ResNet(), num_classes=len(kitti_classes)).cuda()
-#         print(model)
         # Loss model
         loss_module = lossnet.LossNet().cuda() 
         
@@ -505,6 +440,7 @@ if __name__ == '__main__':
             print('>> Datasets are Updated.')
             print('>> LABELED:', len(labeled_set))
             print('>> UNLABELED', len(unlabeled_set))
+            
         # Save a checkpoint
         torch.save({'trial': trial + 1,
                     'state_dict_backbone': models['backbone'].state_dict(),

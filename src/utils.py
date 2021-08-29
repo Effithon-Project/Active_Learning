@@ -30,7 +30,6 @@ def generate_dboxes(model="ssd"):
                     [2, .5],
                     [2, .5]] # 4 6 6 6 4 4 
 
-    #  DefaultBoxes------------------------------------------------------->
     dboxes = DefaultBoxes(figsize, feat_size, steps_h, steps_w, scales, aspect_ratios)
 
     return dboxes
@@ -58,13 +57,10 @@ class DefaultBoxes(object):
         
         fk_h = fig_size[0] / np.array(steps_h)
         fk_w = fig_size[1] / np.array(steps_w)
-#         print(fk_h)
-#         print(fk_w)
         
         self.default_boxes = []
         
         for idx, sfeat in enumerate(self.feat_size):
-#             print(idx)
             
             # S_k
             sk1_h = scales[idx][0] / fig_size[0] # 384
@@ -91,23 +87,14 @@ class DefaultBoxes(object):
                 w, h = sk1_w * sqrt(alpha), sk1_h / sqrt(alpha)
             
                 all_sizes.append((w, h)) 
-                
-#             print(len(all_sizes))
+
         
             for w, h in all_sizes:
-#                 print("w", w, "h", h)
                 for i, j in itertools.product(range(sfeat[0]), range(sfeat[1])):
                     # i = height, j = width
-#                     print(fk_w)
-#                     print(fk_h)
                     cx, cy = (j + 0.5) / fk_w[idx], (i + 0.5) / fk_h[idx]
-#                     print("here")
                     self.default_boxes.append((cx, cy, w, h))
-                    
-#         print(type(self.default_boxes))
-#         print(len(self.default_boxes)) # 45976
-#         print(len(self.default_boxes[0])) # 4
-#         print(self.default_boxes[0]) # (array([0.003125, 0.003125]), array([0.01041667, 0.01041667]), 0.2, 0.20000000000000004)
+    
         self.dboxes = torch.tensor(self.default_boxes, dtype=torch.float)
         
         self.dboxes.clamp_(min=0, max=1)
@@ -128,7 +115,6 @@ class Encoder(object):
         
         self.dboxes = dboxes(order="ltrb") # left top right bottom
         self.dboxes_xywh = dboxes(order="xywh").unsqueeze(dim=0)
-#         print(self.dboxes_xywh.size())
         self.nboxes = self.dboxes.size(0)
         self.scale_xy = dboxes.scale_xy
         self.scale_wh = dboxes.scale_wh
@@ -143,7 +129,7 @@ class Encoder(object):
         best_dbox_ious.index_fill_(0, best_bbox_idx, 2.0)
 
         idx = torch.arange(0, best_bbox_idx.size(0), dtype=torch.int64)
-        best_dbox_idx[best_bbox_idx[idx]] = idxs
+        best_dbox_idx[best_bbox_idx[idx]] = idx
 
         # filter IoU > 0.5
         masks = best_dbox_ious > criteria
@@ -157,7 +143,9 @@ class Encoder(object):
     def scale_back_batch(self, bboxes_in, scores_in):
         """
             Do scale and transform from xywh to ltrb
-            suppose input Nx4xnum_bbox Nxlabel_numxnum_bbox
+            suppose input 
+            bboxes_in: N x 4 x num_bbox 
+            scores_in: N x label_num x num_bbox
         """
         if bboxes_in.device == torch.device("cpu"):
             self.dboxes = self.dboxes.cpu()
@@ -165,17 +153,30 @@ class Encoder(object):
         else:
             self.dboxes = self.dboxes.cuda()
             self.dboxes_xywh = self.dboxes_xywh.cuda()
-
+            
+#         print("bboxes: ",bboxes_in.size()) # torch.Size([1, 4, 45976])
+#         print("scores: ",scores_in.size()) # torch.Size([1, 9, 45976])
         bboxes_in = bboxes_in.permute(0, 2, 1)
         scores_in = scores_in.permute(0, 2, 1)
+#         print("bboxes: ",bboxes_in.size()) # torch.Size([1, 45976, 4])
+#         print("scores: ",scores_in.size()) # torch.Size([1, 45976, 9])
+        print("="*50)
+        print("bboxes: ",bboxes_in[0][0])
+        print("scores: ",scores_in[0][0])
+        print("="*50)
 
-        bboxes_in[:, :, :2] = self.scale_xy * bboxes_in[:, :, :2]
-        bboxes_in[:, :, 2:] = self.scale_wh * bboxes_in[:, :, 2:]
+        bboxes_in[:, :, :2] = self.scale_xy * bboxes_in[:, :, :2] # 0.1곱함
+        bboxes_in[:, :, 2:] = self.scale_wh * bboxes_in[:, :, 2:] # 0.2곱함
+        print("bboxes: ",bboxes_in[0][0], "after scaling")
 
         bboxes_in[:, :, :2] = bboxes_in[:, :, :2] * self.dboxes_xywh[:, :, 2:] + self.dboxes_xywh[:, :, :2]
         bboxes_in[:, :, 2:] = bboxes_in[:, :, 2:].exp() * self.dboxes_xywh[:, :, 2:]
+        # x, y <= 0.1*(x, y)*dboxes_wh(order="xywh") + dboxes_xy(order="xywh")
+        # w, h <= exp((w, h)x0.2) * dboxes_wh(order="xywh")
+        print("bboxes: ",bboxes_in[0][0], "after more calculating")
         
         bboxes_in = box_convert(bboxes_in, in_fmt="cxcywh", out_fmt="xyxy")
+        print("bboxes: ",bboxes_in[0][0], "after converting")
 
         return bboxes_in, F.softmax(scores_in, dim=-1)
 

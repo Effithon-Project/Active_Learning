@@ -9,24 +9,21 @@ import torch.nn.functional as F
 
 
 class LossNet(nn.Module):
-    """
-    feature_sizes바꿀려면 dboxes_generate 바꿔야함
-    num_channels <- model.py out_channels
-    """
+    
     def __init__(self,
-                 feature_sizes_y=[160, 80, 40, 20, 10, 4],
-                 feature_sizes_x=[48, 24, 12, 6, 3, 1],
+                 feature_sizes_x=[160, 80, 40, 20, 10, 4],
+                 feature_sizes_y=[48, 24, 12, 6, 3, 1],
                  num_channels=[1024, 512, 512, 256, 256, 256],
                  interm_dim=128):
         
         super(LossNet, self).__init__()
         
-        self.GAP1 = nn.AvgPool2d((feature_sizes_x[0], feature_sizes_y[0])) #x, y
-        self.GAP2 = nn.AvgPool2d((feature_sizes_x[1], feature_sizes_y[1]))
-        self.GAP3 = nn.AvgPool2d((feature_sizes_x[2], feature_sizes_y[2]))
-        self.GAP4 = nn.AvgPool2d((feature_sizes_x[3], feature_sizes_y[3]))
-        self.GAP5 = nn.AvgPool2d((feature_sizes_x[4], feature_sizes_y[4]))
-        self.GAP6 = nn.AvgPool2d((feature_sizes_x[5], feature_sizes_y[5]))
+        self.GAP1 = nn.AvgPool2d((feature_sizes_y[0], feature_sizes_x[0]))
+        self.GAP2 = nn.AvgPool2d((feature_sizes_y[1], feature_sizes_x[1]))
+        self.GAP3 = nn.AvgPool2d((feature_sizes_y[2], feature_sizes_x[2]))
+        self.GAP4 = nn.AvgPool2d((feature_sizes_y[3], feature_sizes_x[3]))
+        self.GAP5 = nn.AvgPool2d((feature_sizes_y[4], feature_sizes_x[4]))
+        self.GAP6 = nn.AvgPool2d((feature_sizes_y[5], feature_sizes_x[5]))
 
         self.FC1 = nn.Linear(num_channels[0], interm_dim) 
         self.FC2 = nn.Linear(num_channels[1], interm_dim) 
