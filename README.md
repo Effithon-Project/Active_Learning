@@ -22,6 +22,7 @@ If you can run `main.py`, the setting is done.
 1. SSD(ResNet50) + Kitti(Object detection) + Learning loss
     - Learning loss code [Github](https://github.com/Mephisto405/Learning-Loss-for-Active-Learning)
     - SSD(ResNet50) [Github](https://github.com/uvipen/SSD-pytorch)
+    - Wandb [Github](https://github.com/borisdayma/lightning-kitti)
     - Kitti parameter [Github](https://github.com/seonghoon247/SSD-KITTI/blob/master/nets/ssd_vgg_384x1280.py)
     - [maybe later](https://discuss.pytorch.org/t/solved-pytorch1-5-runtimeerror-one-of-the-variables-needed-for-gradient-computation-has-been-modified-by-an-inplace-operation/90256/7?fbclid=IwAR2qafREIOGt2vekmEE6cF0uVyoLQgoMerAWMHPIl3KVNt1vqup02T3lgnU) : PyTorch 1.5.0 이상 버전에서 model weight update와 관련된 inplace operation이 수정되면서 zero_grad -> backward -> step의 과정이 최적화하고자 하는 변수의 순서에 맞춰서 수행되어야 해결되는 것으로 알고 있습니다.
     
