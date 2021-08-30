@@ -165,9 +165,9 @@ class Encoder(object):
         print("scores: ",scores_in[0][0])
         print("="*50)
 
-        bboxes_in[:, :, :2] = self.scale_xy * bboxes_in[:, :, :2] # 0.1곱함
-        bboxes_in[:, :, 2:] = self.scale_wh * bboxes_in[:, :, 2:] # 0.2곱함
-        print("bboxes: ",bboxes_in[0][0], "after scaling")
+#         bboxes_in[:, :, :2] = self.scale_xy * bboxes_in[:, :, :2] # 0.1곱함
+#         bboxes_in[:, :, 2:] = self.scale_wh * bboxes_in[:, :, 2:] # 0.2곱함
+#         print("bboxes: ",bboxes_in[0][0], "after scaling")
 
         bboxes_in[:, :, :2] = bboxes_in[:, :, :2] * self.dboxes_xywh[:, :, 2:] + self.dboxes_xywh[:, :, :2]
         bboxes_in[:, :, 2:] = bboxes_in[:, :, 2:].exp() * self.dboxes_xywh[:, :, 2:]

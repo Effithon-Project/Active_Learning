@@ -26,7 +26,7 @@ class KittiDataset(Kitti):
     labels_dir_name = "label_2"
     
     def __init__(self,root, train = True, transform= None):
-        super(KittiDataset, self).__init__(root)
+        super(KittiDataset, self).__init__(root, train = True, transform= None)
         
         self.images = []
         self.targets = []
@@ -69,17 +69,34 @@ class KittiDataset(Kitti):
         
         counter = 1
         self.label_info[0] = "background"
+        self.label_info_reverse["background"] = 0
         
         for c in categories:
             
-            self.label_map[counter] = counter
-            # {0: 'background'
+            self.label_map[counter] = counter # {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9}
             self.label_info[counter] = c
-            # {'background' : 0 
+            #         {0: 'background',
+            #          1: 'Car',
+            #          2: 'Cyclist',
+            #          3: 'DontCare',
+            #          4: 'Misc',
+            #          5: 'Pedestrian',
+            #          6: 'Person_sitting',
+            #          7: 'Tram',
+            #          8: 'Truck',
+            #          9: 'Van'}
             self.label_info_reverse[c] = counter
+            #         {'Car': 1,
+            #          'Cyclist': 2,
+            #          'DontCare': 3,
+            #          'Misc': 4,
+            #          'Pedestrian': 5,
+            #          'Person_sitting': 6,
+            #          'Tram': 7,
+            #          'Truck': 8,
+            #          'Van': 9}
             
             counter += 1
-        
 
 
     def __getitem__(self, item):
@@ -96,6 +113,18 @@ class KittiDataset(Kitti):
             bbox = annotation.get("bbox")
             
             # left(x), top(y), right(x), bottom(y) -> xmin, ymin, xmax, ymax
+#             if image_id == "003382":
+#                 print("-"*10)
+#                 print(bbox[0])
+#                 print(bbox[1])
+#                 print(bbox[2])
+#                 print(bbox[3])
+#                 print("w", width, "h", height)
+#                 print(bbox[0]/width)
+#                 print(bbox[1]/height)
+#                 print(bbox[2]/width)
+#                 print(bbox[3]/height)
+                
             boxes.append([bbox[0] / width,
                           bbox[1] / height,
                           bbox[2] / width,
@@ -107,9 +136,15 @@ class KittiDataset(Kitti):
         labels = torch.tensor(labels)
         
         if self.transform is not None:
+#             print("TRANSFORMED")
             image, (height, width), boxes, labels = self.transform(image,
                                                                    (height, width),
                                                                    boxes,
                                                                    labels)
             
+            if image_id == "003382":
+                print("Kittidataset")
+                print(height, width)
+                print(labels.size())
+#             print(labels[labels!=0])
         return image, image_id, (height, width), boxes, labels

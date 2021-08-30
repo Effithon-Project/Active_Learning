@@ -44,8 +44,10 @@ torch.backends.cudnn.deterministic = True # reproduction을 위한 부분
 dboxes = generate_dboxes(model="ssd")
 encoder = Encoder(dboxes)
 # directory you download 'D:\\'
-kitti_tot = KittiDataset("D:\\", train=True,
-                         transform=SSDTransformer(dboxes, (384, 1280),val=False))
+kitti_train = KittiDataset("D:\\", train=True,
+                           transform=SSDTransformer(dboxes, (384, 1280),val=False))
+kitti_test = KittiDataset("D:\\", train=True,
+                          transform=SSDTransformer(dboxes, (384, 1280),val=True))
         
 kitti_unlabeled = KittiDataset("D:\\", train=True,
                                transform=SSDTransformer(dboxes, (384, 1280),val=False))
@@ -147,6 +149,12 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
         print("Parsing batch: {}/{}".format(nbatch, len(test_loader)), end="\r")
 
         img = img.cuda()
+        print("-"*100)
+        print("ID", img_id)
+        
+        if img_id[0] == "003382":
+            print("test function")
+            print(img_size)
         # gloc: tensor([0.0031, 0.0104, 0.2000, 0.2000])
 
         with torch.no_grad():
@@ -156,6 +164,7 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
             
             # batch 묶음에서 이미지 하나 가져오기 idx:0,1,2,3,4,...
             for idx in range(ploc.shape[0]):
+                print("idx", idx)
                 ploc_i = ploc[idx, :, :].unsqueeze(0)
                 plabel_i = plabel[idx, :, :].unsqueeze(0)
                 #----------------------------------------------------------
@@ -163,7 +172,6 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
 #                 glabel_i = glabel[idx, :, :].unsqueeze(0)
 #                 print(glabel_i.size())
                 #----------------------------------------------------------
-                print("*"*50, sum(sum(sum(ploc_i<0)))) # 음수 값 원인 찾아내기
                 try:
                     # decoding NMS
                     result = encoder.decode_batch(ploc_i, plabel_i, nms_threshold, 200)[0] 
@@ -175,7 +183,6 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
                 
 #                 loc, label, prob = [r.cpu().numpy() for r in result]
                 loc, label, prob = [r.cpu() for r in result]
-                print("="*50, sum(loc<0))
                 
                 # 여기까지 tensor
                 det_boxes = loc
@@ -184,7 +191,7 @@ def test(models, dataloaders, encoder, nms_threshold, mode='val'):
                 
                 true_boxes = gloc
                 true_labels = glabel
-                
+                print("-"*100)
                 mAP = calculate_mAP(det_boxes,
                                     det_labels,
                                     det_scores,
@@ -336,8 +343,8 @@ if __name__ == '__main__':
                        "collate_fn": collate_fn,
                        "sampler": SubsetRandomSampler(test_set)}
 
-        train_loader = DataLoader(kitti_tot, **train_params)
-        test_loader = DataLoader(kitti_tot, **test_params)
+        train_loader = DataLoader(kitti_train, **train_params)
+        test_loader = DataLoader(kitti_test, **test_params)
         
         dataloaders  = {'train': train_loader, 'test': test_loader}        
         

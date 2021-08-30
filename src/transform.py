@@ -102,7 +102,7 @@ class RandomHorizontalFlip(object):
 
 
 class SSDTransformer(object):
-    def __init__(self, dboxes, size=(300, 300), val=False):  # (h, w)
+    def __init__(self, dboxes, size=(384, 1280), val=False):  # (h, w)
         self.size = size
         self.val = val
         self.dboxes = dboxes
@@ -116,9 +116,9 @@ class SSDTransformer(object):
         
         self.img_trans = transforms.Compose([
             transforms.Resize(self.size),
-#             transforms.ColorJitter(brightness=0.125, contrast=0.5, saturation=0.5, hue=0.05),
+            transforms.ColorJitter(brightness=0.125, contrast=0.5, saturation=0.5, hue=0.05),
             transforms.ToTensor(),
-#             self.normalize
+            self.normalize
         ])
         
         self.trans_val = transforms.Compose([
@@ -135,12 +135,13 @@ class SSDTransformer(object):
             bbox_out[:bboxes.size(0), :] = bboxes
             label_out[:labels.size(0)] = labels
             return self.trans_val(img), img_size, bbox_out, label_out
-
+        
+#         print(self.size)
         img, img_size, bboxes, labels = self.crop(img, img_size, bboxes, labels)
         img, bboxes = self.hflip(img, bboxes)
-
+#         print(self.img_trans(img).size())
         img = self.img_trans(img).contiguous()
         
         bboxes, labels = self.encoder.encode(bboxes, labels)
-
+        
         return img, img_size, bboxes, labels
